@@ -333,3 +333,168 @@ def compute_star_points(px: int, py: int, pz: int, energy_map: np.ndarray,
         energy_map[px,py,pz-1,1] = elec_zm
 
     return energy_xp, energy_xm, energy_yp, energy_ym, energy_zp, energy_zm
+
+@nb.njit(cache=True, fastmath=True)
+def compute_real_elec(points: np.ndarray, positions: np.ndarray, charges: np.ndarray):
+    elec = np.empty(points.shape[0])
+    for i in range(points.shape[0]):
+        el = 0
+        for j in range(positions.shape[0]):
+            el += charges[j] / np.linalg.norm(points[i] - positions[j])**2
+        elec[i] = el
+    return elec
+
+    
+
+@nb.njit(cache=True, fastmath=True)
+def intersect_box(box1: np.ndarray, box2: np.ndarray, threshold: float):
+    ''' 
+        Return true if box1 and box2 have an intersection.
+    '''
+    return (box1[0,0] - threshold < box2[1,0] and box1[1,0] + threshold > box2[0,0] and
+            box1[0,1] - threshold < box2[1,1] and box1[1,1] + threshold > box2[0,1] and
+            box1[0,2] - threshold < box2[1,2] and box1[1,2] + threshold > box2[0,2])
+
+@nb.njit(cache=True, fastmath=True)   
+def is_reachable(points1, points2, threshold, grid_positions, probe_sigmas2, neighbours):
+    '''
+        Return True if exists a segment shorter than threshold that connects points1 with points2
+        without crossing a barrier in the energy_map higher than max_barrier. 
+    '''
+    threshold2 = threshold**2
+
+    for p1 in range(points1.shape[0]):
+        p1x = points1[p1,0]
+        p1y = points1[p1,1]
+        p1z = points1[p1,2]
+
+        for p2 in range(points2.shape[0]):
+            p2x = points2[p2,0]
+            p2y = points2[p2,1]
+            p2z = points2[p2,2]
+
+            dx = p2x-p1x
+            dy = p2y-p1y
+            dz = p2z-p1z
+            d2 = dx*dx + dy*dy + dz*dz
+
+            if d2 < threshold2:
+                # Check that the segment connecting p1 and p2 does not cross 
+                # a barrier in the energy map. 
+                max_delta = max(np.abs(dx),np.abs(dy),np.abs(dz))
+
+                # Rescale the direction vector making equal to 1 the largest coordinate
+                # It's an equivalent version of the Bresenham's line algorithm
+                slope_x = dx / max_delta
+                slope_y = dy / max_delta
+                slope_z = dz / max_delta
+                
+                good = True
+                for k in range(2, max_delta-1):
+
+                    # Compute the point on the segment to test
+                    px = p1x + slope_x * k
+                    py = p1y + slope_y * k
+                    pz = p1z + slope_z * k
+
+                    kx4 = np.int32(px * 0.25 + 0.5)
+                    ky4 = np.int32(py * 0.25 + 0.5)
+                    kz4 = np.int32(pz * 0.25 + 0.5)
+
+                    n_neighbours = neighbours[kx4,ky4,kz4,0]
+                    i_neighbours = neighbours[kx4,ky4,kz4,1:]
+
+                    for i_neighbour in range(n_neighbours):
+                        i = i_neighbours[i_neighbour]
+
+                        # Fetch the atom position on the grid coordinates
+                        nx = grid_positions[i,0]
+                        ny = grid_positions[i,1]
+                        nz = grid_positions[i,2]
+
+                        # Van de Walls composition rules between the atom and the probe
+                        sigma2 = probe_sigmas2[i]
+
+                        px_nx = px-nx
+                        py_ny = py-ny
+                        pz_nz = pz-nz
+
+                        r2 = px_nx*px_nx + py_ny*py_ny + pz_nz*pz_nz
+
+                        # Is this atom intesected?
+                        if r2 < 0.8 * sigma2:
+                            good = False
+                            break
+
+                    # We don't need to continue on this segment
+                    # we can short-circuit and continue to the next
+                    if not good:
+                        break
+                
+                # An entire line has been completed without 
+                # intersecting any atoms? So the regions are connected!
+                if good:
+                    return True
+    
+    # Connecting the regions was not be possible
+    return False
+
+
+@nb.njit(cache=True, fastmath=True)   
+def get_region_atoms(points, neighbours, grid_positions):
+    '''
+        For each point of the region, this function find the k-nearest atoms.
+        After collecting all the atoms for each point, it returns the unique sorted list.
+    '''
+    atoms = set()
+    k_nearest = 5
+
+    # These arrays are used multiple times to store the k-nearest atoms
+    # for each atom. The atoms are collected using a insert sort 
+    # using these arrays
+    k_r2 = np.empty(k_nearest, dtype=np.float32)
+    k_i  = np.empty(k_nearest, dtype=np.int32)
+
+    for p in range(points.shape[0]):
+        px = points[p,0]
+        py = points[p,1]
+        pz = points[p,2]
+
+        kx4 = (px + 2) >> 2
+        ky4 = (py + 2) >> 2
+        kz4 = (pz + 2) >> 2
+
+        n_neighbours = neighbours[kx4,ky4,kz4,0]
+        i_neighbours = neighbours[kx4,ky4,kz4,1:]
+
+        # Reset the k-nearest arrays
+        k_r2[:] = 1000
+        k_i[:] = -1
+
+        for i_neighbour in range(n_neighbours):
+            i = i_neighbours[i_neighbour]
+
+            # Floating point position on the grid
+            nx = grid_positions[i,0]
+            ny = grid_positions[i,1]
+            nz = grid_positions[i,2]
+
+            r2 = (px-nx)*(px-nx) + (py-ny)*(py-ny) + (pz-nz)*(pz-nz)
+
+            # Insertion sort
+            k = 0
+            while r2 < k_r2[k] and k < k_nearest:
+                k_r2[k] = k_r2[k+1]
+                k_i[k] = k_i[k+1]
+                k += 1
+
+            if k > 0:
+                k_i[k-1] = i
+                k_r2[k-1] = r2
+
+        # Dump the k-nearest arrays into the atoms set
+        for i in range(k_i.shape[0]):
+            if k_i[i] != -1:
+                atoms.add(k_i[i])
+
+    return np.array(sorted(atoms))
