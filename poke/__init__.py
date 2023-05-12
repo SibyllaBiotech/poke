@@ -81,6 +81,80 @@ class Poke:
         self.energy_map: np.ndarray = None
 
         self.parametrizer = None
+
+    def load_atoms_properties(self, charges: np.ndarray, sigmas: np.ndarray, epsilons: np.ndarray) -> 'Poke':
+        '''
+        Load the atoms parameters into the scouter.
+        This function must be called before the scouting.
+        Once the properties are loaded, the scouter can work on multiple frames with the same
+        atoms but different positions.            
+        The parameters should be taken from charmm forcefield.
+
+        Parameters
+        ------------
+            charges: np.ndarray
+                Array with the charges of the atoms.
+            sigmas: np.ndarray
+                Array with the Van der Waals radius of the atoms.
+            epsilons: np.ndarray
+                Array with the strength of the Van der Waals interactions.
+        '''
+        self.charges = charges
+        self.sigmas = sigmas
+        self.epsilons = epsilons
+
+        combined_sigmas = 0.5 * (sigmas + self.probe_sigma)
+
+        self.probe_sigmas2 = (combined_sigmas * self.inverse_spacing)**2 
+        self.probe_epsilons = 6.26 * np.sqrt(epsilons)
+        self.sigma_charges = self.electro_force * self.charges / combined_sigmas**6
+        return self
+
+    def load_atoms_properties_from_mdanalysis(self, atoms):
+        '''
+        Load atoms properties from a AtomGroup of MDAnalysis.
+        Extract the residue names and the atoms names, and internally 
+        it use charmm to obtain charges, sigmas and epsilons. 
+    
+        Parameters
+        ------------
+            atoms: MDAnalysis.AtomGroup
+                The atom group used to set the parameters
+        '''
+        resnames = []
+        atom_names = []
+        for r in atoms.residues:
+            resnames.append(r.resname)
+            atom_names.append(r.atoms.names)
+        
+        return self.load_atoms_properties_from_names(resnames, atom_names)
+       
+
+    def load_atoms_properties_from_names(self, resnames: list[str], atom_names: list[list[str]]) -> 'Poke':
+        '''
+        Load atoms properties from residue names and atoms names.
+        Internally it use charmm forcefield to obtain charges, sigmas and epsilons. 
+
+        Parameters
+        ------------
+            resnames: list[str]
+                List with the residue names
+            atom_names: list[list[str]]
+                List with the atom names for each residue.
+                atom_names 
+                and resnames must have the same length. 
+        '''
+        if self.parametrizer is None:
+            from .forcefield import AtomsParametrizer, charmm
+            self.parametrizer = AtomsParametrizer(charmm)
+
+        charges, sigmas, epsilons = np.concatenate([self.parametrizer(resname, names) 
+                        for resname, names in zip(resnames, atom_names)], axis=0).T
+
+        return self.load_atoms_properties(charges=charges, 
+                                          sigmas=sigmas, 
+                                          epsilons=epsilons)
+
         
     def get_pockets(self, positions: np.ndarray) -> list[Pocket]:
         '''
