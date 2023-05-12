@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "poke"
+authors = [{name = "Sibylla Biotech", email = "computationals@sibyllabiotech.it"}]
+license = {file = "LICENSE"}
+classifiers = ["License :: OSI Approved :: MIT License"]
+dynamic = ["version"]
+
+dependencies = [
+    "numpy",
+    "numba"
+]
+
+[project.urls]
+Home = "https://github.com/SibyllaBiotech/poke"
+
+[project.scripts]
+poke = "poke.main:main"
+
+[tool.setuptools]
+packages = ["poke"]
+
