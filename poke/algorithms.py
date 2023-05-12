@@ -86,3 +86,250 @@ def compute_low_resolution_grid(energy_map: np.ndarray, grid_cutoff: float,
 
     # Add the strength (absolute value) of the eletrostatic potential to the Van der Waals energy 
     energy_map[::4,::4,::4, 0] -= np.abs(energy_map[::4,::4,::4, 1])
+
+
+@nb.njit(cache=True, fastmath=True)
+def enhance_volumes(energy_map: np.ndarray, isovalue: float, 
+                    neighbours: np.ndarray, grid_positions: np.ndarray,
+                    probe_sigmas2: np.ndarray, probe_epsilons: np.ndarray, sigma_charges: np.ndarray):
+    '''
+        Expand the low-energy regions found in the low-resolution map. The expansion is done 
+        on the high-resolution map computing the potential in the missing positions.
+        This function return the set of points under a threshold of total energy.
+    '''
+    # Points that have already been inserted in pockets_points
+    inserted = np.zeros((energy_map.shape[0], energy_map.shape[1], energy_map.shape[2]), dtype=np.uint16)
+
+    # Create lists of points, one for each pocket 
+    pockets_points = np.empty((energy_map.size, 3), dtype=np.int16) # 65536 maximum dimension of the grid along each axis
+    surfaces_points = np.empty((energy_map.size // 2, 3), dtype=np.int16) 
+
+    # For each pocket, mark the beginning of the volume/surface points array (excluding the first one, which starts in zero)
+    # these serve as slicers of the pocket_points and surface_points arrays, avoids computation of the sum of the volumes array
+    # example [17,69,666] can be used as pockets_points[17:69] to extract the points belonging to the second pocket
+    pockets_slicer  = np.zeros(65536, dtype=np.uint32)
+    surfaces_slicer = np.zeros(65536, dtype=np.uint32)
+
+    # Pocket counter, needed for ids
+    # This also serves to keep track of the boundaries of the volumes and surfaces arrays
+    n_pockets = 0
+
+    n_visited = 0
+    n_inserted = 0  
+    n_surfaces = 0
+
+    for i in range(0, energy_map.shape[0], 4):
+        for j in range(0, energy_map.shape[1], 4):
+            for k in range(0, energy_map.shape[2], 4):
+
+                # Find first point belonging to new pocket (root of graph)
+                if energy_map[i,j,k,0] < isovalue and not inserted[i,j,k]:
+
+                    # New pocket found
+                    n_pockets += 1
+
+                    inserted[i,j,k] = n_pockets
+                    pockets_points[n_inserted] = (i,j,k)
+                    n_inserted += 1                   
+                    
+                    while n_visited < n_inserted:
+
+                        # Visit a new point
+                        px = pockets_points[n_visited,0]
+                        py = pockets_points[n_visited,1]
+                        pz = pockets_points[n_visited,2]
+                        n_visited += 1
+                        
+                        n_internal_faces = 0
+
+                        # Compute the energies of the near points 
+                        # that will be used in the following ifs
+                        energy_xp, energy_xm, energy_yp, energy_ym, energy_zp, energy_zm = \
+                            compute_star_points(px,py,pz, energy_map, 
+                                            neighbours, grid_positions, 
+                                            probe_sigmas2, probe_epsilons, sigma_charges)
+                        
+                        # Decide which points are under the threshold and
+                        # must be added in the returning lists
+                        if energy_xp < isovalue:
+                            n_internal_faces += 1
+                            if not inserted[px+1,py,pz]:
+                                inserted[px+1,py,pz] = n_pockets
+                                pockets_points[n_inserted] = (np.int16(px+1),py,pz)
+                                n_inserted += 1
+
+                        if energy_xm < isovalue:
+                            n_internal_faces += 1
+                            if not inserted[px-1,py,pz]:
+                                inserted[px-1,py,pz] = n_pockets
+                                pockets_points[n_inserted] = (np.int16(px-1),py,pz)
+                                n_inserted += 1
+
+                        if energy_yp < isovalue:
+                            n_internal_faces += 1
+                            if not inserted[px,py+1,pz]:
+                                inserted[px,py+1,pz] = n_pockets
+                                pockets_points[n_inserted] = (px,np.int16(py+1),pz)
+                                n_inserted += 1
+
+                        if energy_ym < isovalue:
+                            n_internal_faces += 1
+                            if not inserted[px,py-1,pz]:
+                                inserted[px,py-1,pz] = n_pockets
+                                pockets_points[n_inserted] = (px,np.int16(py-1),pz)
+                                n_inserted += 1
+
+                        if energy_zp < isovalue:
+                            n_internal_faces += 1
+                            if not inserted[px,py,pz+1]:
+                                inserted[px,py,pz+1] = n_pockets
+                                pockets_points[n_inserted] = (px,py,np.int16(pz+1))
+                                n_inserted += 1
+
+                        if energy_zm < isovalue:
+                            n_internal_faces += 1
+                            if not inserted[px,py,pz-1]:
+                                inserted[px,py,pz-1] = n_pockets
+                                pockets_points[n_inserted] = (px,py,np.int16(pz-1))
+                                n_inserted += 1
+
+                        if n_internal_faces <= 4:
+                            surfaces_points[n_surfaces] = (px,py,pz)
+                            n_surfaces += 1
+
+                    pockets_slicer[n_pockets] = n_inserted
+                    surfaces_slicer[n_pockets] = n_surfaces
+                    
+                    # check for IndexError & return 
+                    if n_pockets+1 >= pockets_slicer.shape[0]:
+                        return (inserted, pockets_points[:n_inserted],  pockets_slicer, 
+                                          surfaces_points[:n_surfaces], surfaces_slicer)
+    
+    return (inserted, pockets_points[:n_inserted],   pockets_slicer[:n_pockets+1], 
+                      surfaces_points[:n_surfaces], surfaces_slicer[:n_pockets+1])
+
+
+@nb.njit(cache=True, fastmath=True)
+def compute_star_points(px: int, py: int, pz: int, energy_map: np.ndarray,
+                        neighbours: np.ndarray, grid_positions: np.ndarray, 
+                        probe_sigmas2: np.ndarray, probe_epsilons: np.ndarray, sigma_charges: np.ndarray):
+    '''
+        Compute the potential of the 6 points around the central point (px, py, pz).
+        The computation take in consideration only the atoms in the neighbour list.
+    '''
+
+    # Fetch energy values from the map
+    energy_xp = energy_map[px+1,py,pz,0] if px+1 < energy_map.shape[0] else 1000
+    energy_xm = energy_map[px-1,py,pz,0] if px > 0 else 1000
+
+    energy_yp = energy_map[px,py+1,pz,0] if py+1 < energy_map.shape[1] else 1000
+    energy_ym = energy_map[px,py-1,pz,0] if py > 0 else 1000
+
+    energy_zp = energy_map[px,py,pz+1,0] if pz+1 < energy_map.shape[2] else 1000
+    energy_zm = energy_map[px,py,pz-1,0] if pz > 0 else 1000
+
+    # Checks if those values were never been computed    
+    compute_xp, energy_xp, elec_xp = (True, 0, 0) if energy_xp == 100 else (False, energy_xp, 0) 
+    compute_xm, energy_xm, elec_xm = (True, 0, 0) if energy_xm == 100 else (False, energy_xm, 0) 
+    compute_yp, energy_yp, elec_yp = (True, 0, 0) if energy_yp == 100 else (False, energy_yp, 0) 
+    compute_ym, energy_ym, elec_ym = (True, 0, 0) if energy_ym == 100 else (False, energy_ym, 0) 
+    compute_zp, energy_zp, elec_zp = (True, 0, 0) if energy_zp == 100 else (False, energy_zp, 0) 
+    compute_zm, energy_zm, elec_zm = (True, 0, 0) if energy_zm == 100 else (False, energy_zm, 0) 
+
+    kx4 = (px + 2) >> 2
+    ky4 = (py + 2) >> 2
+    kz4 = (pz + 2) >> 2
+    n_neighbours = neighbours[kx4,ky4,kz4,0]
+    i_neighbours = neighbours[kx4,ky4,kz4,1:]
+
+    for i_neighbour in range(n_neighbours):
+        i = i_neighbours[i_neighbour]
+
+        # Van de Walls composition rules between the atom and the probe
+        charge = sigma_charges[i]
+        sigma2 = probe_sigmas2[i]
+        epsilon = probe_epsilons[i]
+
+        # Floating point position on the grid
+        nx = grid_positions[i,0]
+        ny = grid_positions[i,1]
+        nz = grid_positions[i,2]
+
+        px_nx = px-nx
+        py_ny = py-ny
+        pz_nz = pz-nz
+
+        r2 = px_nx*px_nx + py_ny*py_ny + pz_nz*pz_nz + 1.002
+
+        # Add the energy contribution of this atom 
+        # on the 6 points around
+        if compute_xp:
+            ir2 = sigma2 / (r2 + 2 * px_nx)
+            ir6 = ir2*ir2*ir2
+            ir12 = ir6*ir6
+            energy_xp += epsilon * (ir12 - ir6)
+            elec_xp += charge * ir6
+
+        if compute_xm:
+            ir2 = sigma2 / (r2 - 2 * px_nx)
+            ir6 = ir2*ir2*ir2
+            ir12 = ir6*ir6
+            energy_xm += epsilon * (ir12 - ir6)
+            elec_xm += charge * ir6
+
+        if compute_yp:
+            ir2 = sigma2 / (r2 + 2 * py_ny)
+            ir6 = ir2*ir2*ir2
+            ir12 = ir6*ir6
+            energy_yp += epsilon * (ir12 - ir6)
+            elec_yp += charge * ir6
+
+        if compute_ym:
+            ir2 = sigma2 / (r2 - 2 * py_ny)
+            ir6 = ir2*ir2*ir2
+            ir12 = ir6*ir6
+            energy_ym += epsilon * (ir12 - ir6)
+            elec_ym += charge * ir6
+
+        if compute_zp:
+            ir2 = sigma2 / (r2 + 2 * pz_nz)
+            ir6 = ir2*ir2*ir2
+            ir12 = ir6*ir6
+            energy_zp += epsilon * (ir12 - ir6)
+            elec_zp += charge * ir6
+
+        if compute_zm:
+            ir2 = sigma2 / (r2 - 2 * pz_nz)
+            ir6 = ir2*ir2*ir2
+            ir12 = ir6*ir6
+            energy_zm += epsilon * (ir12 - ir6)
+            elec_zm += charge * ir6
+
+
+    # Save the computed values in the map
+    if compute_xp:
+        energy_xp -= np.abs(elec_xp)
+        energy_map[px+1,py,pz,0] = energy_xp
+        energy_map[px+1,py,pz,1] = elec_xp
+    if compute_xm:
+        energy_xm -= np.abs(elec_xm)
+        energy_map[px-1,py,pz,0] = energy_xm
+        energy_map[px-1,py,pz,1] = elec_xm
+    if compute_yp:
+        energy_yp -= np.abs(elec_yp)
+        energy_map[px,py+1,pz,0] = energy_yp
+        energy_map[px,py+1,pz,1] = elec_yp
+    if compute_ym:
+        energy_ym -= np.abs(elec_ym)
+        energy_map[px,py-1,pz,0] = energy_ym
+        energy_map[px,py-1,pz,1] = elec_ym
+    if compute_zp:
+        energy_zp -= np.abs(elec_zp)
+        energy_map[px,py,pz+1,0] = energy_zp
+        energy_map[px,py,pz+1,1] = elec_zp
+    if compute_zm:
+        energy_zm -= np.abs(elec_zm)
+        energy_map[px,py,pz-1,0] = energy_zm
+        energy_map[px,py,pz-1,1] = elec_zm
+
+    return energy_xp, energy_xm, energy_yp, energy_ym, energy_zp, energy_zm
