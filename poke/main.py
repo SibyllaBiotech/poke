@@ -40,48 +40,63 @@ def main():
                         'filter the pockets with a condition.')
     parser.add_argument('-z', '--compress', action='store_true', default=False, help=
                         'compress the results using gzip, most of the programs can read them without problem.')
-    
-
     args = parser.parse_args()
 
     try:
+        # args.structures contains all the inputs in sequence
+        # split_structures produce a iterator of chunks to be passed to the Universe constructor
         for structures in split_structures(args.structures):
+
+            # Define the output folder for this chunk using the stem name of the 
+            # first structure in the chunk that usually is the reference (.pdb / .gro)
             out_dir = args.output / structures[0].stem.split('.', maxsplit=1)[0]
             out_dir.mkdir(parents=True, exist_ok=True)
 
+            # Suppress the warning during the opening of the structures
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 u = Universe(*structures)
             atoms = u.atoms
 
+            # Initialize the scouter with the atoms 
             scouter = Poke().load_atoms_properties_from_mdanalysis(atoms)
             frames = []
             pockets = []
             
+            # Run the scouter for each frame
             for i, ts in enumerate(u.trajectory):
                 frame_pockets = scouter.get_pockets(ts.positions)
 
+                # When there are many frame write a progress if not quiet
                 if i >= 10 and i % 10 == 0 and not args.quiet:
                     print(f'{" ".join(map(str, structures))} frame {i}', end='\r')
                 
+                # Apply a filter to the pockets evaluating the args.filter on each pocket
                 if args.filter is not None:
                     frame_pockets = [p for p in frame_pockets if eval(args.filter, p.__dict__, {"volume": p.volume, "surface": p.surface})]
 
+                # Add one element to the lists (the frame analysed and the pockets found)
+                # If the args.extract is active, the element is added only if at least one pocket was found
                 if not args.extract or len(frame_pockets) > 0: 
                     frames.append(i)
                     pockets.append(frame_pockets)
             
+            # Complete the progress writing the total number of frames analyzed
             if i >= 10 and not args.quiet:
                 print(f'{" ".join(map(str, structures))} {i} frames', end='\r')
 
+            # If args.extract is set, write a new trajectory with all
+            # the frames collected in the list (with at least a pocket)
             if args.extract:
                 write_coordinates(out_dir, u, frames)
 
             if args.descriptors:
                 write_desciptors(out_dir, atoms, pockets, frames)
 
-            if args.volumes:
+            if args.volumes:                
                 if args.extract:
+                    # If the args.extract flag is active the pymol script needs a 
+                    # trajectory with only the frames written by write_coordinates
                     write_points(args, out_dir, [structures[0], out_dir / 'frames.xtc'], pockets)
                 else:
                     write_points(args, out_dir, structures, pockets)
@@ -94,6 +109,12 @@ def main():
 
 
 def split_structures(structures: list[Path]):
+    '''
+        Split the list of inputs in chunks.
+        Every chunk start with a file with structure_suffixes.
+        and continues until the next structure_suffixes.
+        If it finds a .txt file, add its lines to the input list.
+    '''
     output_list = None
 
     for i, s in enumerate(structures, 1):
@@ -118,16 +139,24 @@ def split_structures(structures: list[Path]):
         yield output_list
 
 def write_coordinates(out_dir, u: Universe, frames: list[int]):
+    '''
+        Write an xtc trajectory with a subset of 
+        the frames specified in the list frames.
+    '''
     with Writer(str(out_dir / 'frames.xtc'), multiframe=True) as stream:
         for frame in frames:
             u.trajectory[frame]
             stream.write(u.atoms)
 
 def write_desciptors(out_dir, atoms: AtomGroup, pockets: list[Pocket], frames: list[int]):
+    '''
+        Write a csv with the descriptors for each pocket in the list.
+    '''
     with open(out_dir / 'descriptors.csv', 'wt') as stream:
         writer = csv.writer(stream)
 
-        writer.writerow(('OutputFrame', 'OriginalFrame', 'Volume', 'Surface', 'Lenght1', 'Length2', 'Length3', 'Quadrupole1', 'Quadrupole2', 'Quadrupole3',
+        writer.writerow(('OutputFrame', 'OriginalFrame', 'Volume', 'Surface', 
+                         'Lenght1', 'Length2', 'Length3', 'Quadrupole1', 'Quadrupole2', 'Quadrupole3',
                         'Hydrophobicity', 'Enclousure', '#Regions', '#PolarAtoms', '#ChargedAtoms', 
                         'Residues', 'Atoms'))
 
