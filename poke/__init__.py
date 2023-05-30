@@ -287,8 +287,8 @@ class Poke:
         # Compute the multipole expansion for the electrostatic potential in the points of the surface
         monopole = np.sum(electro_surface)
         dipole = np.linalg.norm(np.sum(electro_surface * residuals.T, axis=1))
-        # quadrupoles = np.linalg.eigvalsh(np.dot(electro_surface * residuals.T, residuals)) / residuals.shape[0]
-        # quadrupoles = np.sqrt(np.abs(quadrupoles) + 1e-8)[::-1] * self.spacing        
+        quadrupoles = np.linalg.eigvalsh(np.dot(electro_surface * residuals.T, residuals)) / residuals.shape[0]
+        quadrupoles = np.sqrt(np.abs(quadrupoles) + 1e-8)[::-1] * self.spacing        
 
         # Counts polar and apolar atoms
         abs_charges = np.abs(self.charges[atoms])
@@ -301,7 +301,7 @@ class Poke:
         # Create a pocket with properties computed
         return Pocket(self.origin, spacing_matrix, volume_points=volume_points, 
                       surface_points=surface_points, electro=electro, 
-                      monopole=monopole, dipole=dipole, n_regions=int(n_regions), 
+                      monopole=monopole, dipole=dipole, quadrupoles=quadrupoles, n_regions=int(n_regions), 
                       atoms=atoms, lengths=lengths, enclousure=enclousure,
                       hydrophobicity=hydrophobicity, n_polar_atoms=n_polar_atoms, 
                       n_charges_atoms=n_charges_atoms)

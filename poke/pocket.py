@@ -9,7 +9,7 @@ class Pocket:
     '''
     def __init__(self, origin: np.ndarray, spacing: np.ndarray, 
                  volume_points: np.ndarray, surface_points: np.ndarray, electro: np.ndarray,
-                 monopole: np.ndarray, dipole: np.ndarray,  
+                 monopole: np.ndarray, dipole: np.ndarray,  quadrupoles: np.ndarray,
                  n_regions: int, atoms: np.ndarray, lengths: np.ndarray,
                  hydrophobicity: float, enclousure: float,
                  n_polar_atoms: int, n_charges_atoms: int) -> None:
@@ -21,6 +21,7 @@ class Pocket:
         self.electro = electro
         self.monopole = monopole
         self.dipole = dipole
+        self.quadrupoles = quadrupoles
         self.volume_points = volume_points
         self.surface_points = surface_points
         self.n_regions = n_regions
@@ -48,7 +49,14 @@ class Pocket:
         '''
         Points of the pocket as floating point coordinate 
         '''
-        return self.origin + np.dot(self.spacing, self.volume_points.T).T
+        return self.origin + self.volume_points @ self.spacing.T
+    
+    @property
+    def surface_positions(self):
+        '''
+        Points of the pocket as floating point coordinate 
+        '''
+        return self.origin + self.surface_points @ self.spacing.T
 
     @property
     def electro_histogram(self):
@@ -67,10 +75,11 @@ class Pocket:
         '''
         Transform the points of the pocket applying a linear transformation.
         '''
+        self.origin = np.dot(transformation_matrix, self.origin)
         self.spacing = np.dot(transformation_matrix, self.spacing) 
 
-    def minimal_bounding_box_rotation(self):
-        p = self.volume_positions
+    def minimal_bounding_box(self):
+        p = self.surface_positions
 
         θ = 0.1 
         cosθ = np.cos(θ)
@@ -99,22 +108,28 @@ class Pocket:
         rot_steps = [Rx, iRx, Ry, iRy, Rz, iRz]
 
         best_rotation = np.eye(3)
-        best_volume   = np.prod(np.max(p, axis=0) - np.min(p, axis=0))
+        best_min      = np.min(p, axis=0)
+        best_max      = np.max(p, axis=0)
+        best_volume   = np.prod(best_max - best_min)
 
         for _ in range(20):
             for rot_step in rot_steps:
                 trial_rot = rot_step @ best_rotation
-                tp = np.einsum("ij,kj->ki", trial_rot, p)
-                trial_vol = np.prod(np.max(tp, axis=0) - np.min(tp, axis=0))
+                tp = np.einsum('ij,kj->ki', trial_rot, p)
+                trial_min = np.min(tp, axis=0)
+                trial_max = np.max(tp, axis=0)
+                trial_vol = np.prod(trial_max - trial_min)
                 
                 if trial_vol < best_volume:
                     best_rotation = trial_rot
-                    best_volume = trial_vol
+                    best_volume = trial_vol 
+                    best_min = trial_min
+                    best_max = trial_max
 
-        return best_rotation
+        origin = best_min @ best_rotation
+        box_vectors = np.diag(best_max - best_min) @ best_rotation
+        return origin, box_vectors
 
-        
-        
     def features(self):
         return np.array([1,2,3])
 
