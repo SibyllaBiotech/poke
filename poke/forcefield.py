@@ -46,6 +46,7 @@ class AtomsParametrizer:
 
         # Replace the atom names of the residue
         replaced_names = [replacer.get(n, n) for n in atom_names]
+        replaced_names = [n[1:]+n[0] if n[0] in "123456789" else n for n in atom_names]
         replaced_names_set = set(replaced_names)
 
         # Compute a "matching" score for each trial set
@@ -55,4 +56,8 @@ class AtomsParametrizer:
         residue_params = residue_params[np.argmax(scores)]
 
         # Return the parameters in the same order of the atom_names list
-        return np.array([residue_params[atom] for atom in replaced_names], dtype=np.float32)
+        try:
+            return np.array([residue_params[atom] for atom in replaced_names], dtype=np.float32)
+        except:
+            raise ValueError('Atoms in the forcefield: \n' + '\n'.join(sorted(residue_params.keys())) +
+                           '\nAtoms in the residue after replacement: \n' + '\n'.join(sorted(replaced_names)))
