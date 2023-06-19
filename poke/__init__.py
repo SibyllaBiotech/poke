@@ -281,6 +281,7 @@ class Poke:
         lengths = np.sqrt(variances)[::-1] * self.spacing
 
         # Extract the electrostatic potential
+        energy = self.energy_map[volume_points[:,0], volume_points[:,1], volume_points[:,2], 0] 
         electro = self.energy_map[volume_points[:,0], volume_points[:,1], volume_points[:,2], 1]
         electro_surface = self.energy_map[surface_points[:,0], surface_points[:,1], surface_points[:,2], 1]
 
@@ -300,7 +301,7 @@ class Poke:
 
         # Create a pocket with properties computed
         return Pocket(self.origin, spacing_matrix, volume_points=volume_points, 
-                      surface_points=surface_points, electro=electro, 
+                      surface_points=surface_points, energy=energy, electro=electro, 
                       monopole=monopole, dipole=dipole, quadrupoles=quadrupoles, n_regions=int(n_regions), 
                       atoms=atoms, lengths=lengths, enclousure=enclousure,
                       hydrophobicity=hydrophobicity, n_polar_atoms=n_polar_atoms, 

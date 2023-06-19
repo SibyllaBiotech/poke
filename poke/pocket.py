@@ -1,4 +1,7 @@
+import pickle
 import numpy as np
+
+from pathlib import Path
 
 class Pocket:
     '''
@@ -7,8 +10,15 @@ class Pocket:
         an origin and a spacing. Electrostatic potential for each point is 
         present.              
     '''
+
+    # Machine learning model to score 
+    # the pocket starting from descriptors
+    scoring_model = None
+
+
     def __init__(self, origin: np.ndarray, spacing: np.ndarray, 
-                 volume_points: np.ndarray, surface_points: np.ndarray, electro: np.ndarray,
+                 volume_points: np.ndarray, surface_points: np.ndarray, 
+                 energy: np.ndarray, electro: np.ndarray,
                  monopole: np.ndarray, dipole: np.ndarray,  quadrupoles: np.ndarray,
                  n_regions: int, atoms: np.ndarray, lengths: np.ndarray,
                  hydrophobicity: float, enclousure: float,
@@ -18,6 +28,7 @@ class Pocket:
         '''
         self.origin = origin
         self.spacing = spacing
+        self.energy = energy
         self.electro = electro
         self.monopole = monopole
         self.dipole = dipole
@@ -31,6 +42,7 @@ class Pocket:
         self.enclousure = enclousure
         self.n_polar_atoms = n_polar_atoms
         self.n_charges_atoms = n_charges_atoms
+        self.score = self.compute_score()
 
     @property
     def volume_unit(self) -> float:
@@ -63,7 +75,14 @@ class Pocket:
         '''
         Compute a large-bins histogram for potential energy of the volume points
         '''
-        return np.histogram(self.electro, bins=[-3.5, -1.5, -0.5, +0.5, +1.5, +3.5])
+        return np.histogram(self.electro, bins=[-1.5, -1.0, -0.5, +0.5, +1.0, +1.5])[0]
+    
+    @property
+    def energy_quants(self):
+        '''
+        Compute a large-bins histogram for potential energy of the volume points
+        '''
+        return np.quantile(self.energy, q=[0.1, 0.3, 0.5, 0.6, 0.9])
     
     def translate(self, vector: np.ndarray):
         '''
@@ -131,7 +150,16 @@ class Pocket:
         return origin, box_vectors
 
     def features(self):
-        return np.array([1,2,3])
+        return [self.volume, self.surface, self.monopole, self.dipole, self.volume / self.surface**(3/2),
+                self.hydrophobicity, self.enclousure, 
+                self.n_polar_atoms, self.n_charges_atoms,
+                *self.lengths, *self.electro_histogram, *self.quadrupoles, *self.energy_quants]
+    
+    def compute_score(self):
+        if self.scoring_model is None:
+            model_path = Path(__file__).parent / 'model.pickle'
+            self.scoring_model = pickle.loads(model_path.read_bytes())
+        return self.scoring_model(np.array(self.features()))[0]
 
     def __repr__(self) -> str:
         return f'<Pocket volume={self.volume:.1f} #atoms={len(self.atoms)}>'
