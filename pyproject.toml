@@ -23,4 +23,7 @@ poke = "poke.main:main"
 
 [tool.setuptools]
 packages = ["poke"]
+include-package-data = true
 
+[tool.setuptools.package-data]
+poke = ["model.pickle"]

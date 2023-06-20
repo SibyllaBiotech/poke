@@ -11,3 +11,5 @@ __pycache__/
 /jobs
 /benchmark
 /.sib
+
+/build
