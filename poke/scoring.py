@@ -33,11 +33,11 @@ class Scorer(nn.Module):
 
         self.layers = nn.Sequential(
             nn.BatchNorm1d(in_features),
-            nn.Linear(in_features, 48),
+            nn.Linear(in_features, 64),
             nn.Sigmoid(),
-            nn.BatchNorm1d(48),
+            nn.BatchNorm1d(64),
             nn.Dropout(0.01),
-            nn.Linear(48, 1),
+            nn.Linear(64, 1),
         )
 
     def forward(self, x):
@@ -89,10 +89,14 @@ class Scorer(nn.Module):
 
                     metric = R2Score()
                     metric.update(test_predictions, test_targets)
-                    r2 = metric.compute()
+                    test_r2 = metric.compute()
+
+                    metric = R2Score()
+                    metric.update(outputs, train_targets)
+                    train_r2 = metric.compute()
 
                     model.train()
-                    print(f'Epoch {i:<4} Train Loss: {loss:.4g} Test Loss: {test_loss:.4g} r2: {r2:.4g}')
+                    print(f'Epoch {i:<4} Train Loss: {loss:.4g} Test Loss: {test_loss:.4g} Train r2: {train_r2:.4g} Test r2: {test_r2:.4g}')
         except KeyboardInterrupt:
             pass
 
