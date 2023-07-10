@@ -155,18 +155,18 @@ def write_desciptors(out_dir, atoms: AtomGroup, pockets: list[Pocket], frames: l
     with open(out_dir / 'descriptors.csv', 'wt') as stream:
         writer = csv.writer(stream)
 
-        writer.writerow(('OutputFrame', 'OriginalFrame', 'Score', 'Volume', 'Surface', 
+        writer.writerow(('OutputFrame', 'OriginalFrame', 'PocketResid', 'Score', 'Volume', 'Surface', 
                          'Lenght1', 'Length2', 'Length3', 'Quadrupole1', 'Quadrupole2', 'Quadrupole3',
                         'Hydrophobicity', 'Enclousure', '#Regions', '#PolarAtoms', '#ChargedAtoms', 
                         'Residues', 'Atoms'))
 
         for frame, pks in enumerate(pockets):
-            writer.writerows((frame, frames[frame], f'{p.score:.2f}', f'{p.volume:.2f}', f'{p.surface:.2f}', 
+            writer.writerows((frame, frames[frame], 800+id,  f'{p.score:.2f}', f'{p.volume:.2f}', f'{p.surface:.2f}', 
                               *(f'{l:.2f}' for l in p.lengths), *(f'{l:.2f}' for l in p.quadrupoles), 
                               f'{p.hydrophobicity:.2f}', f'{p.enclousure:.2f}', p.n_regions, 
                               p.n_polar_atoms, p.n_charges_atoms, 
                               ' '.join(map(str, atoms[p.atoms].residues.resids)),
-                              ' '.join(map(str, p.atoms))) for p in pks)
+                              ' '.join(map(str, p.atoms))) for id, p in enumerate(pks))
 
 
 def write_points(args, out_dir, structures: list[Path],  pockets: list[list[Pocket]]):
