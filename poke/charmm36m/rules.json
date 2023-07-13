@@ -3,19 +3,37 @@
         "default": {
             "H": "HN",
             "OC1": "OT1",
-            "OC2": "OT2"
+            "OC2": "OT2",
+            "HA3": "HA1",
+            "HB3": "HB1",
+            "HD3": "HD1",
+            "HE3": "HE1",
+            "HG3": "HG1"
         },
         "SER": {
             "H": "HN",
             "OC1": "OT1",
             "OC2": "OT2",
-            "HG": "HG1"
+            "HG": "HG1",
+            "HB3": "HB1"
         },
         "CYS": {
             "H": "HN",
             "OC1": "OT1",
             "OC2": "OT2",
-            "HG": "HG1"
+            "HG": "HG1",
+            "HB3": "HB1"
+        },
+        "ILE": {
+            "H": "HN",
+            "OC1": "OT1",
+            "OC2": "OT2",
+            "CD1": "CD",
+            "HD11": "HD1",
+            "HD12": "HD2",
+            "HD13": "HD3",
+            "HG13": "HG11",
+            "HG23": "HG21"
         }
     }
 }
