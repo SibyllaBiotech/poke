@@ -131,6 +131,7 @@ class Molecule:
 
     def generate_3d_coordinates(self, mmffVariant='MMFF94s', maxIters=1500) -> 'Molecule':
         rdkit = Chem.Mol(self.rdkit)
+        AllChem.EmbedMolecule(rdkit, AllChem.ETKDGv3())
         AllChem.MMFFOptimizeMolecule(rdkit, mmffVariant=mmffVariant, maxIters=maxIters)
         return Molecule(rdkit)
 
