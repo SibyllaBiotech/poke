@@ -75,7 +75,7 @@ class PocketWriter:
             'set sphere_scale,0.1',
             'set connect_mode,1',
             f'cmd.load(os.path.join(script_path, "{os.path.relpath(pockets, output.parent)}"), "pockets")',
-            'spectrum b, blue_white_red, pocket, minimum=-2, maximum=+2'
+            'spectrum b, blue_white_red, pocket, minimum=-1, maximum=+1'
         ]))
 
 
