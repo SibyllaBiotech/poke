@@ -12,7 +12,7 @@ from .algorithms import compute_low_resolution_grid, enhance_volumes, \
 class Poke:
     def __init__(self, spacing: float=0.5, cutoff: float=7.5, 
                  electro_force: float=1120, probe_sigma: float=3.8,
-                 energy_threshold: float=-14.5, min_body_volume: float=26, 
+                 energy_threshold: float=-14.5, min_body_volume: float=20, 
                  min_spot_volume: float=2.7, max_spot_distance: float=3.6):
         '''
         Poke object found drugguable pockets.
