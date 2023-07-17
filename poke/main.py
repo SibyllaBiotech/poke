@@ -11,6 +11,8 @@ from poke.filter import PocketFilter
 from poke.writer import PocketWriter
 from MDAnalysis import Universe, AtomGroup, Writer
 
+warnings.filterwarnings('ignore', category=UserWarning, module='MDAnalysis')
+
 structure_suffixes = ('.pdb', '.gro', '.pdbqt')
 trajectory_suffixes = ('.xtc', '.trr')
 list_suffixes = ('.txt',)
@@ -54,9 +56,7 @@ def main():
             out_dir.mkdir(parents=True, exist_ok=True)
 
             # Suppress the warning during the opening of the structures
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                u = Universe(*structures)
+            u = Universe(*structures)
             atoms = u.atoms
 
             # Initialize the scouter with the atoms 
