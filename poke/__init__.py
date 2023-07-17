@@ -13,7 +13,8 @@ class Poke:
     def __init__(self, spacing: float=0.5, cutoff: float=7.5, 
                  electro_force: float=1120, probe_sigma: float=3.8,
                  energy_threshold: float=-14.5, min_body_volume: float=26, 
-                 min_spot_volume: float=2.7, max_spot_distance: float=3.6):
+                 min_spot_volume: float=2.7, max_bulk_distance: float=2.0, 
+                 max_spot_distance: float=3.6):
         '''
         Poke object found drugguable pockets.
         Atom properties must be provided using one of the methods available.
@@ -62,6 +63,7 @@ class Poke:
         self.energy_threshold = energy_threshold
         self.min_body_points = min_body_volume / spacing**3
         self.min_spot_points = min_spot_volume / spacing**3
+        self.max_bulk_distance = max_bulk_distance / spacing
         self.max_spot_distance = max_spot_distance / spacing
 
         self.charges: np.ndarray = None
@@ -223,29 +225,50 @@ class Poke:
             The spots that are near a body will be added to it.
             For each body + near spots a Pocket object will be returned.
         '''
-        big_regions: list[Region] = []
-        small_regions: list[Region] = []
+        big_regions: set[Region] = set()
+        small_regions: set[Region] = set()
+        grouped_regions: list[list[Region]] = []
 
         # Divide the regions in big regions (bodies) and small regions (spots)
         for r in regions:
-            (big_regions if r.volume >= self.min_body_points else small_regions).append(r)
+            (big_regions if r.volume >= self.min_body_points else small_regions).add(r)
+        
+        # Merge big regions in groups if they are close enough
+        while big_regions:
+            group = [big_regions.pop()]
+            stack = {group[0]}
+            while stack:
+                r1 = stack.pop()
+                for r2 in list(big_regions):
+                    if intersect_box(r1.box, r2.box, self.max_bulk_distance):
+                        if is_reachable(r1.surface_points, r2.surface_points, self.max_bulk_distance, 
+                                    self.grid_positions, self.probe_sigmas2, self.neighbours):
+                            big_regions.remove(r2)
+                            group.append(r2)
+                            stack.add(r2)
 
-        pockets = []      
-        for br in big_regions:
-            volume_points = [br.volume_points]
-            surface_points = [br.surface_points]
+            grouped_regions.append(group)
 
-            # Search for small regions near the current big region
-            for sr in small_regions:
-                if intersect_box(br.box, sr.box, self.max_spot_distance):
-                    if is_reachable(br.surface_points, sr.surface_points, self.max_spot_distance, 
-                                    self.grid_positions, self.probe_sigmas2,
-                                    self.neighbours):
-                        volume_points.append(sr.volume_points)
-                        surface_points.append(sr.surface_points)
 
-            # Compute descriptors and add it to the current list of pockets
+        # Add small regions around the big ones and build the pockets
+        pockets = []
+        for br_group in grouped_regions:
+            volume_points = []
+            surface_points = []
+            small_regions_tmp = small_regions.copy()
+            for br in br_group:
+                volume_points.append(br.volume_points)
+                surface_points.append(br.surface_points)
+                for sr in list(small_regions_tmp):
+                    if intersect_box(br.box, sr.box, self.max_spot_distance):
+                         if is_reachable(br.surface_points, sr.surface_points, self.max_spot_distance, 
+                                         self.grid_positions, self.probe_sigmas2, self.neighbours):
+                            volume_points.append(sr.volume_points)
+                            surface_points.append(sr.surface_points)
+                            small_regions_tmp.remove(sr)
+            
             pockets.append(self.compute_descriptors(volume_points, surface_points))
+
         return pockets
 
     def compute_descriptors(self, volume_points: np.ndarray, surface_points: np.ndarray) -> Pocket:
