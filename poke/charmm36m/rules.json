@@ -1,5 +1,9 @@
 {
-    "replace": {
+    "residues_replacers": {
+        "TP1": "PTR",
+        "TP2": "PTR"
+    },
+    "atoms_replacers": {
         "default": {
             "H": "HN",
             "OC1": "OT1",
