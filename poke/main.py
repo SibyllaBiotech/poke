@@ -50,11 +50,6 @@ def main():
         # split_structures produce a iterator of chunks to be passed to the Universe constructor
         for structures in split_structures(args.structures):
 
-            # Define the output folder for this chunk using the stem name of the 
-            # first structure in the chunk that usually is the reference (.pdb / .gro)
-            out_dir = args.output / structures[0].stem.split('.', maxsplit=1)[0]
-            out_dir.mkdir(parents=True, exist_ok=True)
-
             # Suppress the warning during the opening of the structures
             u = Universe(*structures)
             atoms = u.atoms
@@ -85,6 +80,11 @@ def main():
             # Complete the progress writing the total number of frames analyzed
             if i >= 10 and not args.quiet:
                 print(f'{" ".join(map(str, structures))} {i} frames', end='\r')
+
+            # Define the output folder for this chunk using the stem name of the 
+            # first structure in the chunk that usually is the reference (.pdb / .gro)
+            out_dir = args.output / structures[0].stem.split('.', maxsplit=1)[0]
+            out_dir.mkdir(parents=True, exist_ok=True)
 
             # If args.extract is set, write a new trajectory with all
             # the frames collected in the list (with at least a pocket)
