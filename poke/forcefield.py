@@ -11,6 +11,8 @@ class AtomsParametrizer:
         self.residues = json.loads((ff / 'residues.json').read_bytes())
         self.rules = json.loads((ff / 'rules.json').read_bytes())
         self.residues_sets = {resname: [set(i) for i in l] for resname, l in self.residues.items()}
+        self.residues_replacers = self.rules['residues_replacers']
+        self.atoms_replacers = self.rules['atoms_replacers']
     
     def __call__(self, resname, atom_names):
         '''
@@ -35,6 +37,7 @@ class AtomsParametrizer:
             epsilons:
                 depth of the Van der Waals interaction    
         '''
+        resname = self.residues_replacers.get(resname, resname)
         residue_params = self.residues.get(resname)
         residue_sets = self.residues_sets.get(resname)
 
@@ -42,7 +45,7 @@ class AtomsParametrizer:
             raise RuntimeError(f'Residue {resname} unknown')
 
         # Fetch the replacer for this residue, use the default if there is no specific replacer
-        replacer = self.rules['replace'].get(resname, self.rules['replace']['default'])
+        replacer = self.atoms_replacers.get(resname, self.atoms_replacers['default'])
 
         # Replace the atom names of the residue
         replaced_names = [n[1:]+n[0] if n[0] in "123456789" else n for n in atom_names]
@@ -59,5 +62,11 @@ class AtomsParametrizer:
         try:
             return np.array([residue_params[atom] for atom in replaced_names], dtype=np.float32)
         except:
-            raise ValueError(f'Atoms in the forcefield for residue {resname}: \n' + '\n'.join(sorted(residue_params.keys())) +
-                           '\nAtoms in the residue after replacement: \n' + '\n'.join(sorted(replaced_names)))
+            error_msg = f'Some atoms names of residue {resname} are not matching the forcefield:\n'
+     
+            for i, (variant, score) in enumerate(zip(residue_sets, scores)):
+                error_msg += (f'\n\nOption {i+1} with score: {score:.2f}' +
+                             '\nInput file: ' + ", ".join(replaced_names_set - variant) +
+                             '\nForcefield: ' + ", ".join(variant - replaced_names_set))
+                                
+            raise ValueError(error_msg)
