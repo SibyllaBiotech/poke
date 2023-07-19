@@ -48,25 +48,46 @@ class AtomsParametrizer:
         replacer = self.atoms_replacers.get(resname, self.atoms_replacers['default'])
 
         # Replace the atom names of the residue
-        replaced_names = [n[1:]+n[0] if n[0] in "123456789" else n for n in atom_names]
+        replaced_names = [n[1:]+n[0] if n[0].isdigit() else n for n in atom_names]
         replaced_names = [replacer.get(n, n) for n in replaced_names]
         replaced_names_set = set(replaced_names)
-
-        # Compute a "matching" score for each trial set
-        scores = [len(replaced_names_set & trial) / len(trial) for trial in residue_sets]
-
-        # Use the set with the best score
-        residue_params = residue_params[np.argmax(scores)]
-
-        # Return the parameters in the same order of the atom_names list
+       
+        # Find the parameters for this residue using the names of the atoms
         try:
-            return np.array([residue_params[atom] for atom in replaced_names], dtype=np.float32)
+            best_params = residue_params[residue_sets.index(replaced_names_set)]
         except:
-            error_msg = f'Some atoms names of residue {resname} are not matching the forcefield:\n'
+            error_msg = f'Some atoms names of residue {resname} are not matching the forcefield:'
      
-            for i, (variant, score) in enumerate(zip(residue_sets, scores)):
-                error_msg += (f'\n\nOption {i+1} with score: {score:.2f}' +
-                             '\nInput file: ' + ", ".join(replaced_names_set - variant) +
-                             '\nForcefield: ' + ", ".join(variant - replaced_names_set))
+            for i, trial in enumerate(residue_sets):
+                error_msg += (f'\n\nForcefield option {i+1}: {", ".join(sorted(trial))}' +
+                             '\nUnmatching input atoms:      ' + ", ".join(sorted(replaced_names_set - trial)) +
+                             '\nUnmatching forcefield atoms: ' + ", ".join(sorted(trial - replaced_names_set)))
                                 
             raise ValueError(error_msg)
+  
+        return np.array([best_params[atom] for atom in replaced_names], dtype=np.float32)
+        
+
+
+    def match_score(names, forcefield):
+        '''
+        Jaccard similarity between the two sets of atoms names.
+        '''
+        intersection = len(names & forcefield) 
+        return intersection / (len(names) + len(forcefield) - intersection)
+
+    def find_best_match(names, forcefield_sets, forcefield_params):
+        best_params = None
+        best_score = -1
+
+        for trial, params in zip(forcefield_sets, forcefield_params):
+            in_names = names - trial
+            ff_names = trial - names
+
+            
+
+
+            # elif score > best_score:
+            #     best_params = params
+            #     best_score = score
+        return best_params
