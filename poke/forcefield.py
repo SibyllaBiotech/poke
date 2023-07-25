@@ -9,10 +9,8 @@ class AtomsParametrizer:
 
     def __init__(self, ff: Path) -> None:
         self.residues = json.loads((ff / 'residues.json').read_bytes())
-        self.rules = json.loads((ff / 'rules.json').read_bytes())
-        self.residues_sets = {resname: [set(i) for i in l] for resname, l in self.residues.items()}
-        self.residues_replacers = self.rules['residues_replacers']
-        self.atoms_replacers = self.rules['atoms_replacers']
+        self.resnames = json.loads((ff / 'resnames.json').read_bytes())
+        self.atoms_types = np.loadtxt(ff / 'atoms.csv', dtype=np.float32, delimiter=',')
     
     def __call__(self, resname, atom_names):
         '''
@@ -37,57 +35,47 @@ class AtomsParametrizer:
             epsilons:
                 depth of the Van der Waals interaction    
         '''
-        resname = self.residues_replacers.get(resname, resname)
-        residue_params = self.residues.get(resname)
-        residue_sets = self.residues_sets.get(resname)
+        residues = self.resnames.get(resname)
 
-        if residue_params is None:
-            raise RuntimeError(f'Residue {resname} unknown')
-
-        # Fetch the replacer for this residue, use the default if there is no specific replacer
-        replacer = self.atoms_replacers.get(resname, self.atoms_replacers['default'])
-
-        # Replace the atom names of the residue
-        replaced_names = [n[1:]+n[0] if n[0].isdigit() else n for n in atom_names]
-        replaced_names = [replacer.get(n, n) for n in replaced_names]
-        replaced_names_set = set(replaced_names)
+        if residues is None:
+            raise RuntimeError(f'Resname {resname} unknown. Add it to poke/charmm36m/resnames.json')
+        
+        input_atom_names = [n[1:]+n[0] if n[0].isdigit() else n for n in atom_names]
+        input_atoms = set(atom_names)
+        
        
         # Find the parameters for this residue using the names of the atoms
-        try:
-            best_params = residue_params[residue_sets.index(replaced_names_set)]
-        except:
+        best_types = None
+        best_len = 0
+
+        for residue_key in residues:
+            residue = self.residues[residue_key]
+            params = residue['params']
+
+            for ff_atoms_list in residue["names"]:
+                ff_atoms = set(ff_atoms_list)
+            
+                if ff_atoms >= input_atoms and (best_types is None or len(ff_atoms) < best_len):
+                    best_types = [params[ff_atoms_list.index(name)] for name in input_atom_names]  
+                    best_len = len(ff_atoms)
+                    
+                    if best_len == len(input_atoms):
+                        break
+
+        if best_types is not None:
+            return self.atoms_types[best_types]
+
+        else:
             error_msg = f'Some atoms names of residue {resname} are not matching the forcefield:'
      
-            for i, trial in enumerate(residue_sets):
-                error_msg += (f'\n\nForcefield option {i+1}: {", ".join(sorted(trial))}' +
-                             '\nUnmatching input atoms:      ' + ", ".join(sorted(replaced_names_set - trial)) +
-                             '\nUnmatching forcefield atoms: ' + ", ".join(sorted(trial - replaced_names_set)))
+            for residue_key in residues:
+                residue = self.residues[residue_key]
+
+                for i, ff_atoms_list in enumerate(residue["names"]):
+                    ff_atoms = set(ff_atoms_list)
+
+                error_msg += (f'\n\nForcefield option {residue_key} {i}: {", ".join(sorted(ff_atoms))}' +
+                               '\nUnmatching input atoms:      ' + ", ".join(sorted(input_atoms - ff_atoms)) +
+                               '\nUnmatching forcefield atoms: ' + ", ".join(sorted(ff_atoms - input_atoms)))
                                 
             raise ValueError(error_msg)
-  
-        return np.array([best_params[atom] for atom in replaced_names], dtype=np.float32)
-        
-
-
-    def match_score(names, forcefield):
-        '''
-        Jaccard similarity between the two sets of atoms names.
-        '''
-        intersection = len(names & forcefield) 
-        return intersection / (len(names) + len(forcefield) - intersection)
-
-    def find_best_match(names, forcefield_sets, forcefield_params):
-        best_params = None
-        best_score = -1
-
-        for trial, params in zip(forcefield_sets, forcefield_params):
-            in_names = names - trial
-            ff_names = trial - names
-
-            
-
-
-            # elif score > best_score:
-            #     best_params = params
-            #     best_score = score
-        return best_params
