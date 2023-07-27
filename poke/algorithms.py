@@ -441,13 +441,16 @@ def is_reachable(points1, points2, threshold, grid_positions, probe_sigmas2, nei
 
 
 @nb.njit(cache=True, fastmath=True)   
-def get_region_atoms(points, neighbours, grid_positions):
+def get_region_atoms(points, neighbours, grid_positions, k_nearest):
     '''
         For each point of the region, this function find the k-nearest atoms.
         After collecting all the atoms for each point, it returns the unique sorted list.
     '''
     atoms = set()
-    k_nearest = 5
+
+    # Accumulation vector for computing the enclosure
+    net_vector = np.zeros(shape=3, dtype=np.float32)
+    net_count = 0
 
     # These arrays are used multiple times to store the k-nearest atoms
     # for each atom. The atoms are collected using a insert sort 
@@ -497,4 +500,9 @@ def get_region_atoms(points, neighbours, grid_positions):
             if k_i[i] != -1:
                 atoms.add(k_i[i])
 
-    return np.array(sorted(atoms))
+                # Add to the accumulation vector the vector from the pocket point to the atom              
+                net_vector += grid_positions[k_i[i]] - points[p]
+                net_count += 1
+                
+
+    return np.array(sorted(atoms)), np.linalg.norm(net_vector / net_count)

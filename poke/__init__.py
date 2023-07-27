@@ -61,10 +61,10 @@ class Poke:
         self.electro_force = electro_force
         self.probe_sigma = probe_sigma
         self.energy_threshold = energy_threshold
-        self.min_body_points = min_body_volume / spacing**3
-        self.min_spot_points = min_spot_volume / spacing**3
-        self.max_bulk_distance = max_bulk_distance / spacing
-        self.max_spot_distance = max_spot_distance / spacing
+        self.min_body_points = min_body_volume * self.inverse_spacing**3
+        self.min_spot_points = min_spot_volume * self.inverse_spacing**3
+        self.max_bulk_distance = max_bulk_distance * self.inverse_spacing
+        self.max_spot_distance = max_spot_distance * self.inverse_spacing
 
         self.charges: np.ndarray = None
         self.sigmas: np.ndarray = None
@@ -290,13 +290,13 @@ class Poke:
         # Concatenate the list of points
         volume_points = np.concatenate(volume_points)
         surface_points = np.concatenate(surface_points)
-        
+
         # Compute the list of the atoms surrounding the pocket
-        atoms = get_region_atoms(surface_points, self.neighbours, self.grid_positions)
+        atoms, net_vector = get_region_atoms(surface_points, self.neighbours, self.grid_positions, k_nearest=int(20 * self.spacing**2 + 0.5))
 
         # The enclousure is computed using the ratio between 
         # the number of atoms and the number of surface points
-        enclousure = 1 - np.exp(-3 * atoms.shape[0] / surface_points.shape[0])
+        enclousure = np.exp(-0.2 * net_vector**2)
 
         # Compute three orthogonal lengths of the pocket diagonalizing the autocorrelation matrix
         residuals = surface_points - np.mean(surface_points, axis=0)
@@ -306,18 +306,9 @@ class Poke:
         # Extract the electrostatic potential
         energy = self.energy_map[volume_points[:,0], volume_points[:,1], volume_points[:,2], 0] 
         electro = self.energy_map[volume_points[:,0], volume_points[:,1], volume_points[:,2], 1]
-        electro_surface = self.energy_map[surface_points[:,0], surface_points[:,1], surface_points[:,2], 1]
-
-        # Compute the multipole expansion for the electrostatic potential in the points of the surface
-        monopole = np.sum(electro_surface)
-        dipole = np.linalg.norm(np.sum(electro_surface * residuals.T, axis=1))
-        quadrupoles = np.linalg.eigvalsh(np.dot(electro_surface * residuals.T, residuals)) / residuals.shape[0]
-        quadrupoles = np.sqrt(np.abs(quadrupoles) + 1e-8)[::-1] * self.spacing        
 
         # Counts polar and apolar atoms
-        abs_charges = np.abs(self.charges[atoms])
-        n_apolar_atoms, n_polar_atoms, n_charges_atoms = np.histogram(abs_charges, bins=[0, 0.3, 0.7, 10])[0]
-        hydrophobicity = n_apolar_atoms / atoms.shape[0]
+        charges = self.charges[atoms]
 
         # The pocket requires a spacing as a full-matrix 
         spacing_matrix = np.diag(np.full(3, self.spacing, dtype=np.float32))
@@ -325,10 +316,7 @@ class Poke:
         # Create a pocket with properties computed
         return Pocket(self.origin, spacing_matrix, volume_points=volume_points, 
                       surface_points=surface_points, energy=energy, electro=electro, 
-                      monopole=monopole, dipole=dipole, quadrupoles=quadrupoles, n_regions=int(n_regions), 
-                      atoms=atoms, lengths=lengths, enclousure=enclousure,
-                      hydrophobicity=hydrophobicity, n_polar_atoms=n_polar_atoms, 
-                      n_charges_atoms=n_charges_atoms)
+                      atoms=atoms, charges=charges, lengths=lengths, enclousure=enclousure)
 
 
     def write_bulk_map(self, out: os.PathLike):

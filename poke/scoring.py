@@ -33,11 +33,11 @@ class Scorer(nn.Module):
 
         self.layers = nn.Sequential(
             nn.BatchNorm1d(in_features),
-            nn.Linear(in_features, 64),
+            nn.Linear(in_features, 32),
             nn.Sigmoid(),
-            nn.BatchNorm1d(64),
+            nn.BatchNorm1d(32),
             nn.Dropout(0.01),
-            nn.Linear(64, 1),
+            nn.Linear(32, 1),
         )
 
     def forward(self, x):
@@ -46,7 +46,7 @@ class Scorer(nn.Module):
     @classmethod
     def train_with(cls, train_pockets: list[Pocket], train_scores: list[float],
                         test_pockets: list[Pocket], test_scores: list[float],   
-                        epochs: int=50, learning_rate: float=0.005, report_every: int=None):
+                        epochs: int=50, learning_rate: float=0.001, report_every: int=None):
 
         if torch.cuda.is_available(): 
             device = torch.device("cuda:0") 
@@ -63,8 +63,10 @@ class Scorer(nn.Module):
         # Initialize the model
         model = cls(in_features=train_features.shape[1]).to(device)
 
-        optimizer = optim.Adagrad(model.parameters(), lr=learning_rate)
+        optimizer = optim.Adamax(model.parameters(), lr=learning_rate)
         criterion = nn.MSELoss()
+
+        consecutive_train_better = 0
 
         try:
             for i in range(epochs):
@@ -94,6 +96,13 @@ class Scorer(nn.Module):
                     metric = R2Score()
                     metric.update(outputs, train_targets)
                     train_r2 = metric.compute()
+
+                    if loss < test_loss:
+                        consecutive_train_better += 1
+                        if test_features.shape[0] > 20 and consecutive_train_better > 15:
+                            break
+                    else:
+                        consecutive_train_better = 0
 
                     model.train()
                     print(f'Epoch {i:<4} Train Loss: {loss:.4g} Test Loss: {test_loss:.4g} Train r2: {train_r2:.4g} Test r2: {test_r2:.4g}')

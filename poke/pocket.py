@@ -19,10 +19,7 @@ class Pocket:
     def __init__(self, origin: np.ndarray, spacing: np.ndarray, 
                  volume_points: np.ndarray, surface_points: np.ndarray, 
                  energy: np.ndarray, electro: np.ndarray,
-                 monopole: np.ndarray, dipole: np.ndarray,  quadrupoles: np.ndarray,
-                 n_regions: int, atoms: np.ndarray, lengths: np.ndarray,
-                 hydrophobicity: float, enclousure: float,
-                 n_polar_atoms: int, n_charges_atoms: int) -> None:
+                 atoms: np.ndarray, charges: np.ndarray, lengths: np.ndarray, enclousure: float) -> None:
         '''
             Initialize the pocket with the specified values (points and descriptors)   
         '''
@@ -30,18 +27,14 @@ class Pocket:
         self.spacing = spacing
         self.energy = energy
         self.electro = electro
-        self.monopole = monopole
-        self.dipole = dipole
-        self.quadrupoles = quadrupoles
         self.volume_points = volume_points
         self.surface_points = surface_points
-        self.n_regions = n_regions
         self.atoms = atoms
+        self.charges = charges
         self.lengths = lengths
-        self.hydrophobicity = hydrophobicity
         self.enclousure = enclousure
-        self.n_polar_atoms = n_polar_atoms
-        self.n_charges_atoms = n_charges_atoms
+        self.n_apolar_atoms, self.n_polar_atoms, self.n_charges_atoms = np.histogram(np.abs(charges), bins=[0, 0.3, 0.7, 10])[0]
+        self.hydrophobicity = self.n_apolar_atoms / self.atoms.shape[0]
         self.score = self.compute_score()
 
     @property
@@ -78,12 +71,26 @@ class Pocket:
         return np.histogram(self.electro, bins=[-1.5, -1.0, -0.5, +0.5, +1.0, +1.5])[0]
     
     @property
+    def charges_histogram(self):
+        '''
+        Compute a large-bins histogram for atoms charges
+        '''
+        return np.histogram(self.charges, bins=[-10, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 10])[0]
+    
+    @property
+    def energy_histogram(self):
+        '''
+        Compute a large-bins histogram for potential energy of the volume points
+        '''
+        return np.histogram(self.energy, bins=[-100, -25, -24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, 0])[0]
+    
+    @property
     def energy_quants(self):
         '''
         Compute a large-bins histogram for potential energy of the volume points
         '''
-        return np.quantile(self.energy, q=[0.1, 0.3, 0.5, 0.6, 0.9])
-    
+        return np.quantile(self.energy, q=[0.05, 0.1, 0.3, 0.5, 0.6, 0.9])
+
     def translate(self, vector: np.ndarray):
         '''
         Translate the pocket along the specified vector
@@ -150,10 +157,7 @@ class Pocket:
         return origin, box_vectors
 
     def features(self):
-        return [self.volume, self.surface, self.monopole, self.dipole, self.volume / self.surface**(3/2),
-                self.hydrophobicity, self.enclousure, 
-                self.n_polar_atoms, self.n_charges_atoms,
-                *self.lengths, *self.electro_histogram, *self.quadrupoles, *self.energy_quants]
+        return [self.volume, self.enclousure, *self.energy_quants, *self.charges_histogram]
     
     def compute_score(self):
         if self.scoring_model is None:
