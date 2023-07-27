@@ -16,6 +16,7 @@ warnings.filterwarnings('ignore', category=UserWarning, module='MDAnalysis')
 structure_suffixes = ('.pdb', '.gro', '.pdbqt')
 trajectory_suffixes = ('.xtc', '.trr')
 list_suffixes = ('.txt',)
+resid_start = 800
 
 def main():
     parser = argparse.ArgumentParser()
@@ -155,21 +156,35 @@ def write_desciptors(out_dir, atoms: AtomGroup, pockets: list[Pocket], frames: l
     with open(out_dir / 'descriptors.csv', 'wt') as stream:
         writer = csv.writer(stream)
 
-        writer.writerow(('OutputFrame', 'OriginalFrame', 'PocketResid', 'Score', 'Volume', 'Surface', 
-                         'Lenght1', 'Length2', 'Length3', 'Hydrophobicity', 'Enclousure',
-                         '#PolarAtoms', '#ChargedAtoms', 'Residues', 'Atoms'))
-
+        header_written = False
         for frame, pks in enumerate(pockets):
-            writer.writerows((frame, frames[frame], 800+id,  f'{p.score:.2f}', f'{p.volume:.2f}', f'{p.surface:.2f}', 
-                              *(f'{l:.2f}' for l in p.lengths), 
-                              f'{p.hydrophobicity:.2f}', f'{p.enclousure:.2f}',
-                              p.n_polar_atoms, p.n_charges_atoms, 
-                              ' '.join(map(str, atoms[p.atoms].residues.resids)),
-                              ' '.join(map(str, p.atoms))) for id, p in enumerate(pks))
+            for id, p in enumerate(pks, resid_start):
+                props = p.props()
+                
+                if not header_written:
+                    writer.writerow((
+                        'OutputFrame', 
+                        'OriginalFrame', 
+                        'PocketResid', 
+                        *props.keys() ,
+                        'Residues', 
+                        'Atoms'
+                    ))
+                    
+                    header_written = True
+
+                writer.writerow((
+                    frame, 
+                    frames[frame], 
+                    id,  
+                    *(f'{v:.2g}' for v in props.values()),
+                    ' '.join(map(str, atoms[p.atoms].residues.resids)),
+                    ' '.join(map(str, p.atoms))
+                ))
 
 
 def write_points(args, out_dir, structures: list[Path],  pockets: list[list[Pocket]]):
-    with PocketWriter(open_stream(out_dir / 'volumes.pdb', 'wt', args.compress)) as writer:
+    with PocketWriter(open_stream(out_dir / 'volumes.pdb', 'wt', args.compress), resid_start=resid_start) as writer:
         for pks in pockets:
             writer.write_frame(pks)
 

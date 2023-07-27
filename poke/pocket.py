@@ -158,6 +158,20 @@ class Pocket:
 
     def features(self):
         return [self.volume, self.enclousure, *self.energy_quants, *self.charges_histogram]
+
+    def props(self):
+        return {
+            'Score': self.score, 
+            'Volume': self.volume, 
+            'Surface': self.surface, 
+            'Lenght1': self.lengths[0],
+            'Length2': self.lengths[1], 
+            'Length3': self.lengths[2], 
+            'Hydrophobicity': self.hydrophobicity,
+            'Enclousure': self.enclousure,
+            '#PolarAtoms': self.n_polar_atoms, 
+            '#ChargedAtoms': self.n_charges_atoms,
+        }
     
     def compute_score(self):
         if self.scoring_model is None:

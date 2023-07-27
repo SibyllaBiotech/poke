@@ -5,7 +5,7 @@ from pathlib import Path
 from .pocket import Pocket
 
 class PocketWriter:
-    def __init__(self, output: TextIO | os.PathLike) -> None:
+    def __init__(self, output: TextIO | os.PathLike, resid_start=1) -> None:
         if isinstance(output, (str, Path)):
             self.output = open(output, 'wt')
             self.close_stream = True
@@ -17,7 +17,7 @@ class PocketWriter:
         self.output.write('CRYST1    1.000    1.000    1.000  90.00  90.00  90.00 P 1           1\n')
         self.model_idx = 1
         self.atom_idx = 1
-        self.resid_idx = 800
+        self.resid_idx = resid_start
 
     def __enter__(self):
         return self
@@ -31,7 +31,7 @@ class PocketWriter:
     
         self.output.write(f'MODEL {self.model_idx:>8}\n') 
         atom_idx = 0
-        for resid, p in enumerate(pockets, 800):
+        for p in pockets:
             for (x,y,z), e in zip(p.volume_positions, p.electro):
                 self.output.write(f'ATOM  {atom_idx:5d}  A   PCK  {self.resid_idx:4d}    {x:8.3f}{y:8.3f}{z:8.3f}  1.00{e:6.2f}\n')
                 atom_idx += 1
