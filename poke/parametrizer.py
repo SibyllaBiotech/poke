@@ -41,7 +41,7 @@ class AtomsParametrizer:
             raise RuntimeError(f'Resname {resname} unknown. Add it to poke/charmm36m/resnames.json')
         
         input_atom_names = [n[1:]+n[0] if n[0].isdigit() else n for n in atom_names]
-        input_atoms = set(atom_names)
+        input_atoms = set(input_atom_names)
         
        
         # Find the parameters for this residue using the names of the atoms

@@ -69,8 +69,8 @@ Poke produce a set of descriptors for each pocket useful to characterize it. The
 ``n_charged_atoms``
   Number of atoms belonging to the pocket with a absolute partial charge greater than 0.7e.
 
-``enclousure``
-  An indicator of the enclousure of the pocket. Computed comparing the number of atoms neighboring the pocket and its surface.
+``enclosure``
+  An indicator of the enclosure of the pocket. Computed comparing the number of atoms neighboring the pocket and its surface.
 
 ## Python package
 The scouter can be used through python to achieve maximum flexibility:
