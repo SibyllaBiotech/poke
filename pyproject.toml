@@ -26,4 +26,4 @@ packages = ["poke"]
 include-package-data = true
 
 [tool.setuptools.package-data]
-poke = ["model.pickle", "charmm36m/*.json"]
+poke = ["model.pickle", "charmm36m/*.json", "charmm36m/*.csv"]
