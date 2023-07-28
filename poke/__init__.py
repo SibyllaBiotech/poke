@@ -147,7 +147,7 @@ class Poke:
                 and resnames must have the same length. 
         '''
         if self.parametrizer is None:
-            from .forcefield import AtomsParametrizer, charmm
+            from .parametrizer import AtomsParametrizer, charmm
             self.parametrizer = AtomsParametrizer(charmm)
 
         charges, sigmas, epsilons = np.concatenate([self.parametrizer(resname, names) 

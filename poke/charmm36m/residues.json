@@ -4875,28 +4875,26 @@
 		"params": [6, 14, 5, 49, 2, 0, 0, 30, 0, 0, 9, 10, 4, 54],
 		"names": [
 			["C", "CA", "CB", "CG", "HA", "HB1", "HB2", "HD", "HG1", "HG2", "HN", "N", "O", "OD"],
-			["C", "CA", "CB", "CG", "HA", "HB1", "HB2", "HD", "HG", "HG2", "H", "N", "O", "OD"]
+			["C", "CA", "CB", "CG", "HA", "HB1", "HB2", "HD", "HG1", "HG2", "H", "N", "O", "OD"]
 		]
 	},
 	"HSER-COO-": {
 		"params": [17, 14, 5, 49, 2, 0, 0, 30, 0, 0, 9, 10, 54, 13, 13],
 		"names": [
 			["C", "CA", "CB", "CG", "HA", "HB1", "HB2", "HD", "HG1", "HG2", "HN", "N", "OD", "OT1", "OT2"],
-			["C", "CA", "CB", "CG", "HA", "HB1", "HB2", "HD", "HG", "HG2", "H", "N", "OD", "OC1", "OC2"]
+			["C", "CA", "CB", "CG", "HA", "HB1", "HB2", "HD", "HG1", "HG2", "H", "N", "OD", "OC1", "OC2"]
 		]
 	},
 	"HSER-NH2": {
 		"params": [6, 19, 5, 49, 12, 12, 2, 0, 0, 30, 0, 0, 18, 4, 54],
 		"names": [
-			["C", "CA", "CB", "CG", "H1", "H2", "HA", "HB1", "HB2", "HD", "HG1", "HG2", "N", "O", "OD"],
-			["C", "CA", "CB", "CG", "H1", "H2", "HA", "HB1", "HB2", "HD", "HG", "HG2", "N", "O", "OD"]
+			["C", "CA", "CB", "CG", "H1", "H2", "HA", "HB1", "HB2", "HD", "HG1", "HG2", "N", "O", "OD"]
 		]
 	},
 	"HSER-NH3+": {
 		"params": [6, 21, 5, 49, 7, 7, 7, 20, 0, 0, 30, 0, 0, 16, 4, 54],
 		"names": [
-			["C", "CA", "CB", "CG", "H1", "H2", "H3", "HA", "HB1", "HB2", "HD", "HG1", "HG2", "N", "O", "OD"],
-			["C", "CA", "CB", "CG", "H1", "H2", "H3", "HA", "HB1", "HB2", "HD", "HG", "HG2", "N", "O", "OD"]
+			["C", "CA", "CB", "CG", "H1", "H2", "H3", "HA", "HB1", "HB2", "HD", "HG1", "HG2", "N", "O", "OD"]
 		]
 	},
 	"HSP": {
