@@ -294,9 +294,9 @@ class Poke:
         # Compute the list of the atoms surrounding the pocket
         atoms, net_vector = get_region_atoms(surface_points, self.neighbours, self.grid_positions, k_nearest=int(20 * self.spacing**2 + 0.5))
 
-        # The enclousure is computed using the ratio between 
+        # The enclosure is computed using the ratio between 
         # the number of atoms and the number of surface points
-        enclousure = np.exp(-0.2 * net_vector**2)
+        enclosure = np.exp(-0.2 * net_vector**2)
 
         # Compute three orthogonal lengths of the pocket diagonalizing the autocorrelation matrix
         residuals = surface_points - np.mean(surface_points, axis=0)
@@ -316,7 +316,7 @@ class Poke:
         # Create a pocket with properties computed
         return Pocket(self.origin, spacing_matrix, volume_points=volume_points, 
                       surface_points=surface_points, energy=energy, electro=electro, 
-                      atoms=atoms, charges=charges, lengths=lengths, enclousure=enclousure)
+                      atoms=atoms, charges=charges, lengths=lengths, enclosure=enclosure)
 
 
     def write_bulk_map(self, out: os.PathLike):

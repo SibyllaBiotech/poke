@@ -19,7 +19,7 @@ class Pocket:
     def __init__(self, origin: np.ndarray, spacing: np.ndarray, 
                  volume_points: np.ndarray, surface_points: np.ndarray, 
                  energy: np.ndarray, electro: np.ndarray,
-                 atoms: np.ndarray, charges: np.ndarray, lengths: np.ndarray, enclousure: float) -> None:
+                 atoms: np.ndarray, charges: np.ndarray, lengths: np.ndarray, enclosure: float) -> None:
         '''
             Initialize the pocket with the specified values (points and descriptors)   
         '''
@@ -32,7 +32,7 @@ class Pocket:
         self.atoms = atoms
         self.charges = charges
         self.lengths = lengths
-        self.enclousure = enclousure
+        self.enclosure = enclosure
         self.n_apolar_atoms, self.n_polar_atoms, self.n_charges_atoms = np.histogram(np.abs(charges), bins=[0, 0.3, 0.7, 10])[0]
         self.hydrophobicity = self.n_apolar_atoms / self.atoms.shape[0]
         self.score = self.compute_score()
@@ -157,7 +157,7 @@ class Pocket:
         return origin, box_vectors
 
     def features(self):
-        return [self.volume, self.enclousure, *self.energy_quants, *self.charges_histogram]
+        return [self.volume, self.enclosure, *self.energy_quants, *self.charges_histogram]
 
     def props(self):
         return {
@@ -168,7 +168,7 @@ class Pocket:
             'Length2': self.lengths[1], 
             'Length3': self.lengths[2], 
             'Hydrophobicity': self.hydrophobicity,
-            'Enclousure': self.enclousure,
+            'Enclosure': self.enclosure,
             '#PolarAtoms': self.n_polar_atoms, 
             '#ChargedAtoms': self.n_charges_atoms,
         }
