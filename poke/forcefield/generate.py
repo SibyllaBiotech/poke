@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 from pathlib import Path
 from .gmxtop import parse_ffnonbonded, parse_rtp, parse_tdb
-from .process import define_atomtypes, add_alternative_names, amber_rules
+from .process import define_atomtypes, add_alternative_names, amber_rules, desmond_rules
 from .encoders import encode_residues, encode_bonds
 
 parser = argparse.ArgumentParser()
@@ -43,6 +43,7 @@ atoms, residues, bonds = define_atomtypes(residue_types)
 
 
 add_alternative_names(residues, amber_rules)
+add_alternative_names(residues, desmond_rules)
 
 np.savetxt(out_dir / 'atoms.csv', atoms, fmt='%.3f', delimiter=',')
 

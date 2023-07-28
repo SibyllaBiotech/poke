@@ -6,6 +6,10 @@ from pathlib import Path
 charmm = Path(__file__).absolute().parent / 'charmm36m'
 
 class AtomsParametrizer:
+    names_replacer = {
+        "OC1": "OT1",
+        "OC2": "OT2"
+    }
 
     def __init__(self, ff: Path) -> None:
         self.residues = json.loads((ff / 'residues.json').read_bytes())
@@ -41,6 +45,7 @@ class AtomsParametrizer:
             raise RuntimeError(f'Resname {resname} unknown. Add it to poke/charmm36m/resnames.json')
         
         input_atom_names = [n[1:]+n[0] if n[0].isdigit() else n for n in atom_names]
+        input_atom_names = [AtomsParametrizer.names_replacer.get(n,n) for n in input_atom_names]
         input_atoms = set(input_atom_names)
         
        
