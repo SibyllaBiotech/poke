@@ -85,7 +85,7 @@ def compute_low_resolution_grid(energy_map: np.ndarray, grid_cutoff: float,
                     energy_map[kx,ky,kz,1] += charge * ir6
 
     # Add the strength (absolute value) of the eletrostatic potential to the Van der Waals energy 
-    energy_map[::4,::4,::4, 0] -= np.abs(energy_map[::4,::4,::4, 1])
+    # energy_map[::4,::4,::4, 0] -= np.abs(energy_map[::4,::4,::4, 1])
 
 
 @nb.njit(cache=True, fastmath=True)
@@ -308,27 +308,27 @@ def compute_star_points(px: int, py: int, pz: int, energy_map: np.ndarray,
 
     # Save the computed values in the map
     if compute_xp:
-        energy_xp -= np.abs(elec_xp)
+        # energy_xp -= np.abs(elec_xp)
         energy_map[px+1,py,pz,0] = energy_xp
         energy_map[px+1,py,pz,1] = elec_xp
     if compute_xm:
-        energy_xm -= np.abs(elec_xm)
+        # energy_xm -= np.abs(elec_xm)
         energy_map[px-1,py,pz,0] = energy_xm
         energy_map[px-1,py,pz,1] = elec_xm
     if compute_yp:
-        energy_yp -= np.abs(elec_yp)
+        # energy_yp -= np.abs(elec_yp)
         energy_map[px,py+1,pz,0] = energy_yp
         energy_map[px,py+1,pz,1] = elec_yp
     if compute_ym:
-        energy_ym -= np.abs(elec_ym)
+        # energy_ym -= np.abs(elec_ym)
         energy_map[px,py-1,pz,0] = energy_ym
         energy_map[px,py-1,pz,1] = elec_ym
     if compute_zp:
-        energy_zp -= np.abs(elec_zp)
+        # energy_zp -= np.abs(elec_zp)
         energy_map[px,py,pz+1,0] = energy_zp
         energy_map[px,py,pz+1,1] = elec_zp
     if compute_zm:
-        energy_zm -= np.abs(elec_zm)
+        # energy_zm -= np.abs(elec_zm)
         energy_map[px,py,pz-1,0] = energy_zm
         energy_map[px,py,pz-1,1] = elec_zm
 
