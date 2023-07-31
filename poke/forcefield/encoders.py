@@ -17,3 +17,6 @@ def encode_bonds(bonds: dict):
 
 def encode_resname_bonds(resname: str, resdata: set):
     return '\t"' + resname + '": ' + str(resdata)
+
+def encode_resnames_map(resnames: dict):
+    return '{\n' + ',\n'.join('\t"' + resname + '": [' + ', '.join(f'"{n}"' for n in resnames[resname]) + ']' for resname in sorted(resnames)) + '\n}'

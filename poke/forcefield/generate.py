@@ -4,7 +4,7 @@ import numpy as np
 from pathlib import Path
 from .gmxtop import parse_ffnonbonded, parse_rtp, parse_tdb
 from .process import define_atomtypes, add_alternative_names, amber_rules, desmond_rules
-from .encoders import encode_residues, encode_bonds
+from .encoders import encode_residues, encode_bonds, encode_resnames_map
 
 parser = argparse.ArgumentParser()
 parser.add_argument('gmx_forcefield', type=Path, help="Path of the gromacs forcefield")
@@ -37,10 +37,10 @@ resnames['CYS'].extend(resnames['CYS2'])
 resnames['GLU'].extend(resnames['GLUP'])
 resnames['HIS'] = [*resnames['HSD'], *resnames['HSE'], *resnames['HSP']]
 resnames['LYS'].extend(resnames['LSN'])
+resnames['NMA'] = resnames['NME']
 resnames['HEM'] = resnames['HEME']
 
 atoms, residues, bonds = define_atomtypes(residue_types)
-
 
 add_alternative_names(residues, amber_rules)
 add_alternative_names(residues, desmond_rules)
@@ -52,3 +52,6 @@ with open(out_dir / 'residues.json', 'w') as file:
 
 with open(out_dir / 'bonds.json', 'w') as file:
     file.write(encode_bonds(bonds))
+
+with open(out_dir / 'resnames.json', 'w') as file:
+    file.write(encode_resnames_map(resnames))

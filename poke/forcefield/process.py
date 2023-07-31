@@ -98,6 +98,21 @@ desmond_rules = {
             "HB3": "HB1",
             "HG1": "HG",
         },
+    },
+
+    "others": {
+        "ACE": {
+            "HH31": "H1",
+            "HH32": "H2",
+            "HH33": "H3",
+        },
+        "NME": {
+            "CH3": "CA", 
+            "HH31": "HA1", 
+            "HH32": "HA2", 
+            "HH33": "HA3", 
+            "HN": "H", 
+        },
     }
 }
 
@@ -117,22 +132,28 @@ def add_alternative_names(residues, rules: dict[str, dict[str,str]]):
         charmm_names = residue['names'][0]
 
         if set(['C', 'CA', 'N']) < set(charmm_names):
-            amino_rules = rules['aminoacids']
-            replacers = amino_rules.get(restype) or \
-                        amino_rules.get(restype.split('-')[0]) or \
-                        amino_rules.get('default')
+            specific_rules = rules.get('aminoacids')
+
+        else:
+            specific_rules = rules.get('others')
+
+        if specific_rules:
+            replacers = specific_rules.get(restype) or \
+                        specific_rules.get(restype.split('-')[0]) or \
+                        specific_rules.get('default')
             
-            if not isinstance(replacers, list):
-                replacers = [replacers]
+            if replacers:                
+                if not isinstance(replacers, list):
+                    replacers = [replacers]
 
-            for replacer in replacers:
-                replaced_names = sorted([replacer.get(name,name) for name in charmm_names])
+                for replacer in replacers:
+                    replaced_names = sorted([replacer.get(name,name) for name in charmm_names])
 
-                if len(set(replaced_names)) < len(replaced_names):
-                    raise RuntimeError(f'{restype} {charmm_names} -> {replaced_names}')
+                    if len(set(replaced_names)) < len(replaced_names):
+                        raise RuntimeError(f'{restype} {charmm_names} -> {replaced_names}')
 
-                if replaced_names not in residue['names']:
-                    residue['names'].append(replaced_names)
+                    if replaced_names not in residue['names']:
+                        residue['names'].append(replaced_names)
 
 
 def define_atomtypes(residue_types):

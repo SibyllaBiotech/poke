@@ -410,6 +410,7 @@
 	"NICH": ["NICH"],
 	"NIY": ["NIY", "NIY-NH3+", "NIY-NH2", "NIY-COO-"],
 	"NLE": ["NLE", "NLE-NH3+", "NLE-NH2", "NLE-COO-"],
+	"NMA": ["NME"],
 	"NME": ["NME"],
 	"NMGLYD": ["NMGLYD"],
 	"NMM": ["NMM", "NMM-NH3+", "NMM-NH2", "NMM-COO-"],
