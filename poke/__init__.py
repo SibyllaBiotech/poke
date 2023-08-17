@@ -24,34 +24,34 @@ class Poke:
         Parameters
         ------------
             spacing: float
-                distance between points in the grid.
-                A smaller distance means more precision but 
-                longer computational times.
+                Distance between points in the grid.
+                A shorter distance corresponds to higher precision, 
+                but it also results in longer computational time.
             cutoff: float
-                The cutoff radius for atoms interactions.
-                A bigger value means more precision but longer 
-                computational times.
+                Cutoff radius for atoms interactions.
+                A bigger value corresponds to higher precision, 
+                but it also results in longer computational time.
             electro_force: float
                 Importance of the electrostatic potential in defining 
-                the shape of the pocket. With higher values 
-                regions with high electrostatic potential are favored 
+                the shape of the pocket. 
+                With higher values, regions with high electrostatic potential are favored 
                 and hydrophilic regions on the surface can appear as pockets.
             probe_sigma: float
                 Size of the probe used to define the shape of the pocket.
             energy_threshold: float
-                After computing the energy map regions below this threshold
-                are kept as pockets. Putting lower values the resulting
-                pockets will be smaller but with higher affinity.
+                After computing the energy map, regions below this threshold
+                are kept as pockets. 
+                By selecting lower values, the resultant pockets 
+                will be of reduced size yet possess stronger affinity.
             min_body_volume: float
                 A region under the threshold can be used as a pocket only
                 if it has a volume greater of this value.
-                Using lower values more small pockets will apper.
+                Using lower values will result in the generation of smaller pockets.
             min_spot_volume: float
-                Small low-energy regions (spots) around a pocket are included 
-                in the output pocket. Only regions greater min_spot_volume
-                are included in the pocket.
+                Small low-energy regions (spots) around a pocket, which are greater than min_spot_volume 
+                are included in the output pocket. 
             max_spot_distance: float
-                Only small regions closer than this value are included in
+                Only regions within a distance less than this value are included in
                 the output. 
         '''
         self.spacing = spacing
@@ -86,10 +86,10 @@ class Poke:
 
     def load_atoms_properties(self, charges: np.ndarray, sigmas: np.ndarray, epsilons: np.ndarray) -> 'Poke':
         '''
-        Load the atoms parameters into the scouter.
+        Load the atoms' parameters into the scouter.
         This function must be called before the scouting.
-        Once the properties are loaded, the scouter can work on multiple frames with the same
-        atoms but different positions.            
+        Once the properties are loaded, the scouter can process multiple
+        frames containing the same atoms but positioned differently.            
         The parameters should be taken from charmm forcefield.
 
         Parameters
@@ -114,9 +114,9 @@ class Poke:
 
     def load_atoms_properties_from_mdanalysis(self, atoms):
         '''
-        Load atoms properties from a AtomGroup of MDAnalysis.
-        Extract the residue names and the atoms names, and internally 
-        it use charmm to obtain charges, sigmas and epsilons. 
+        Load atoms' properties from an AtomGroup of MDAnalysis.
+        Retrieve the names of the residues and atoms, and internally 
+        it uses charmm to obtain charges, sigmas and epsilons. 
     
         Parameters
         ------------
@@ -134,17 +134,16 @@ class Poke:
 
     def load_atoms_properties_from_names(self, resnames: list[str], atom_names: list[list[str]]) -> 'Poke':
         '''
-        Load atoms properties from residue names and atoms names.
-        Internally it use charmm forcefield to obtain charges, sigmas and epsilons. 
+        Retrieves atoms' properties based on the names of residues and atoms.
+        Internally it uses charmm forcefield to obtain charges, sigmas and epsilons. 
 
         Parameters
         ------------
             resnames: list[str]
-                List with the residue names
+                List with the residues' names
             atom_names: list[list[str]]
-                List with the atom names for each residue.
-                atom_names 
-                and resnames must have the same length. 
+                List containing the names of atoms for each residue.
+                atom_names and resnames must have the same length. 
         '''
         if self.parametrizer is None:
             from .parametrizer import AtomsParametrizer, charmm
@@ -161,7 +160,7 @@ class Poke:
     def get_pockets(self, positions: np.ndarray) -> list[Pocket]:
         '''
         Compute the pockets for the conformation specified.
-        Before calling this method atom properties must be loaded
+        Before calling this method, atoms' properties must be loaded
         and the number of atoms must correspond to the number
         of positions provided to this method.    
 
@@ -174,11 +173,11 @@ class Poke:
             pockets: list[Pocket]
                 the list of pockets
         '''
-        # Compute origin and shape of the map
+        # Compute the origin and the shape of the map
         pos_min = np.min(positions, axis=0)
         pos_max = np.max(positions, axis=0)
 
-        # Define the origin and shape of the grid
+        # Define the origin and the shape of the grid
         self.origin = pos_min
         self.shape = np.round((pos_max - pos_min) * self.inverse_spacing).astype(np.int32) + 1
         self.shape_low = self.shape // 4 + 2
@@ -207,7 +206,7 @@ class Poke:
             self.neighbours, self.grid_positions,
             self.probe_sigmas2, self.probe_epsilons, self.sigma_charges)
 
-        # Converts the regions into objects
+        # Convert the regions into objects
         regions = [Region(pockets_points[pockets_slicer[i]:pockets_slicer[i+1]],
                           surfaces_points[surfaces_slicer[i]:surfaces_slicer[i+1]]) 
                     for i in range(pockets_slicer.shape[0]-1)
@@ -216,20 +215,20 @@ class Poke:
         # Cluster the spots with the big regions
         pockets = self.cluster_regions(regions)
 
-        # Create a grid with atoms types
+        # Create a grid with atoms' types
         return pockets
 
     def cluster_regions(self, regions: list['Region']) -> list['Pocket']:
         '''
-            Divide the regions in big regions (bodies) and small regions (spots).
-            The spots that are near a body will be added to it.
-            For each body + near spots a Pocket object will be returned.
+            Divide the regions into big sections (bodies) and small sections (spots). 
+            The spots that are in close proximity to a body will be included within it.
+            For each (body + near spots) a Pocket object will be returned.
         '''
         big_regions: set[Region] = set()
         small_regions: set[Region] = set()
         grouped_regions: list[list[Region]] = []
 
-        # Divide the regions in big regions (bodies) and small regions (spots)
+        # Divide the regions in big sections (bodies) and small sections (spots)
         for r in regions:
             (big_regions if r.volume >= self.min_body_points else small_regions).add(r)
         
@@ -274,13 +273,13 @@ class Poke:
     def compute_descriptors(self, volume_points: np.ndarray, surface_points: np.ndarray) -> Pocket:
         '''
             Compute descriptors of a region to build a Pocket.
-            The majority of the properties are computed using the surface_points
-            because it is more efficent.
+            Most properties are computed using the surface_points
+            due to their greater efficiency.
 
             Parameters
             ------------
                 volume_points: np.ndarray
-                    Points of the regions to compute regions
+                    Points within the regions for region computation
                 surface_points: np.ndarray
                     Points on the surface of the same region
                     
@@ -307,13 +306,13 @@ class Poke:
         energy = self.energy_map[volume_points[:,0], volume_points[:,1], volume_points[:,2], 0] 
         electro = self.energy_map[volume_points[:,0], volume_points[:,1], volume_points[:,2], 1]
 
-        # Counts polar and apolar atoms
+        # Count polar and apolar atoms
         charges = self.charges[atoms]
 
         # The pocket requires a spacing as a full-matrix 
         spacing_matrix = np.diag(np.full(3, self.spacing, dtype=np.float32))
 
-        # Create a pocket with properties computed
+        # Create a pocket with the computed properties
         return Pocket(self.origin, spacing_matrix, volume_points=volume_points, 
                       surface_points=surface_points, energy=energy, electro=electro, 
                       atoms=atoms, charges=charges, lengths=lengths, enclosure=enclosure)
