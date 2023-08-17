@@ -70,7 +70,7 @@ def main():
                 
                 # Apply a filter to the pockets evaluating the args.filter on each pocket
                 if args.filter is not None:
-                    frame_pockets = [p for p in frame_pockets if PocketFilter.evaluate(args.filter, p)]
+                    frame_pockets = [p for p in frame_pockets if PocketFilter.evaluate(args.filter, p, atoms)]
 
                 # Add one element to the lists (the frame analysed and the pockets found)
                 # If the args.extract is active, the element is added only if at least one pocket was found
@@ -105,6 +105,8 @@ def main():
 
             if args.pickle:
                 write_pickle(args, out_dir, pockets)
+
+            
         
     except UserError as error:
         print(error)    
