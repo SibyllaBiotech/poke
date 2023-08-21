@@ -4,13 +4,14 @@ import gzip
 import argparse
 import warnings
 import pickle
-import rich.progress
 from pathlib import Path
 
 from poke import Poke, Pocket
 from poke.filter import PocketEvaluator
 from poke.writer import PocketWriter
 from MDAnalysis import Universe, AtomGroup, Writer
+from rich import progress
+from rich.text import Text
 
 warnings.filterwarnings('ignore', category=UserWarning, module='MDAnalysis')
 
@@ -39,6 +40,8 @@ def main():
                         'save the results relative to a new trajectory containing only frames with at least one pocket.')
     parser.add_argument('-s', '--sort', type=str, metavar='', default='all', help=
                         'selection of atoms used by the scouter.')
+    parser.add_argument('-n', '--max-pockets', type=int, metavar='', default=None, help=
+                        'maximum number of pocket in the output. Only when --sort is used.')
     parser.add_argument('-p', '--pymol', action='store_true', default=False, help=
                         'save a pymol script usable to open the pockets found.')
     parser.add_argument('-k', '--pickle', action='store_true', default=False, help=
@@ -62,8 +65,12 @@ def main():
         # split_structures produce a iterator of chunks to be passed to the Universe constructor
         for structures in split_structures(args.structures):
 
+            # Define the output folder for this chunk using the stem name of the 
+            # first structure in the chunk that usually is the reference (.pdb / .gro)
+            out_dir = args.output / '-'.join(fn.stem.split('.', maxsplit=1)[0] for fn in structures)
+
             # Print the current structures
-            print(f'{" ".join(map(str, structures))}')
+            print(f'{" ".join(map(str, structures))} ▶ ./{out_dir}')
 
             # Suppress the warning during the opening of the structures
             u = Universe(*structures)
@@ -75,20 +82,30 @@ def main():
             frames = []
             pockets = []
 
-            with rich.progress.Progress(
-                        rich.progress.TextColumn('   '),
-                        rich.progress.BarColumn(),
-                        rich.progress.TimeRemainingColumn(),
-                        rich.progress.MofNCompleteColumn(),
-                    ) as progress:
+            with progress.Progress(
+                    progress.TextColumn('   '),
+                    progress.BarColumn(),
+                    progress.TimeElapsedColumn(),
+                    progress.TextColumn('eta'),
+                    progress.TimeRemainingColumn(),
+                    progress.MofNCompleteColumn(),
+                    FrameSpeedColumn(),
+                    PocketsFoundColumn(),
+                ) as progress_bar:
+
+                task = progress_bar.add_task("scouting", total=u.trajectory.n_frames, n_pockets=0, n_kept_pockets=0)
+                n_kept_pockets = 0
+                n_pockets = 0
             
                 # Run the scouter for each frame
-                for i, ts in enumerate(progress.track(u.trajectory)):
+                for i, ts in enumerate(u.trajectory):
                     frame_pockets = scouter.get_pockets(atoms.positions)
+                    n_pockets += len(frame_pockets)
 
                     # Apply a filter to the pockets evaluating the args.filter on each pocket
                     if args.filter is not None:
                         frame_pockets = [p for p in frame_pockets if PocketEvaluator.evaluate(args.filter, p, atoms)]
+                    n_kept_pockets += len(frame_pockets)
 
                     # If sorting is active only the trajectory will be written with only one pocket per frame
                     if args.sort:
@@ -101,13 +118,18 @@ def main():
                         frames.append(i)
                         pockets.append(frame_pockets)
 
+                    progress_bar.update(task, advance=1, n_kept_pockets=n_kept_pockets, n_pockets=n_pockets)
+
             # Sort the pockets
             if args.sort and frames and pockets:
                 frames, pockets = zip(*sorted(zip(frames, pockets), key=lambda fp: PocketEvaluator.evaluate(args.sort, fp[1][0], atoms), reverse=True))
 
-            # Define the output folder for this chunk using the stem name of the 
-            # first structure in the chunk that usually is the reference (.pdb / .gro)
-            out_dir = args.output / structures[0].stem.split('.', maxsplit=1)[0]
+                if args.max_pockets is not None:
+                    frames = frames[:args.max_pockets]
+                    pockets = pockets[:args.max_pockets]
+
+
+            # Create the output directory
             out_dir.mkdir(parents=True, exist_ok=True)
 
             # If args.extract is set, write a new trajectory with all
@@ -119,7 +141,7 @@ def main():
                 write_desciptors(out_dir, atoms, pockets, frames)
 
             if args.volumes:                
-                if args.extract:
+                if args.extract or args.sort:
                     # If the args.extract flag is active the pymol script needs a 
                     # trajectory with only the frames written by write_coordinates
                     write_points(args, out_dir, [out_dir / 'structure.pdb', out_dir / 'frames.xtc'], pockets)
@@ -227,6 +249,24 @@ def open_stream(path: os.PathLike,  mode: str, compressed: bool):
         return gzip.open(str(path) + '.gz', mode)
     else:
         return open(path, mode)
+
+class FrameSpeedColumn(progress.ProgressColumn):
+    def render(self, task: progress.Task) -> Text:
+        speed = task.finished_speed or task.speed
+        if speed is None:
+            return Text("?", style="progress.data.speed")
+        return Text(f"{speed:.0f} frames/s", style="progress.data.speed")
+    
+class PocketsFoundColumn(progress.ProgressColumn):
+    def render(self, task: progress.Task) -> Text:
+        n_filtered = task.fields['n_pockets'] - task.fields['n_kept_pockets']
+ 
+        text = Text(f" {task.fields['n_kept_pockets']} pockets", style="magenta")
+
+        if n_filtered > 0:
+            text += Text(f" {n_filtered} discarted", style="cyan")
+        return text
+
 
 
 class UserError(RuntimeError):
