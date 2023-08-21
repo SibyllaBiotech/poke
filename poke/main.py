@@ -4,6 +4,7 @@ import gzip
 import argparse
 import warnings
 import pickle
+import rich.progress
 from pathlib import Path
 
 from poke import Poke, Pocket
@@ -55,6 +56,9 @@ def main():
         # split_structures produce a iterator of chunks to be passed to the Universe constructor
         for structures in split_structures(args.structures):
 
+            # Print the current structures
+            print(f'{" ".join(map(str, structures))}')
+
             # Suppress the warning during the opening of the structures
             u = Universe(*structures)
             atoms = u.select_atoms(args.atoms)
@@ -64,36 +68,35 @@ def main():
             
             frames = []
             pockets = []
+
+            with rich.progress.Progress(
+                        rich.progress.TextColumn('   '),
+                        rich.progress.BarColumn(),
+                        rich.progress.TimeRemainingColumn(),
+                        rich.progress.MofNCompleteColumn(),
+                    ) as progress:
             
-            # Run the scouter for each frame
-            for i, ts in enumerate(u.trajectory):
-                frame_pockets = scouter.get_pockets(atoms.positions)
+                # Run the scouter for each frame
+                for i, ts in enumerate(progress.track(u.trajectory)):
+                    frame_pockets = scouter.get_pockets(atoms.positions)
 
-                # When there are many frame write a progress if not quiet
-                if i >= 10 and i % 10 == 0 and not args.quiet:
-                    print(f'{" ".join(map(str, structures))} frame {i}', end='\r')
-                
-                # Apply a filter to the pockets evaluating the args.filter on each pocket
-                if args.filter is not None:
-                    frame_pockets = [p for p in frame_pockets if PocketEvaluator.evaluate(args.filter, p, atoms)]
+                    # Apply a filter to the pockets evaluating the args.filter on each pocket
+                    if args.filter is not None:
+                        frame_pockets = [p for p in frame_pockets if PocketEvaluator.evaluate(args.filter, p, atoms)]
 
-                # If sorting is active only the trajectory will be written with only one pocket per frame
-                if args.sort:
-                    for p in frame_pockets:
+                    # If sorting is active only the trajectory will be written with only one pocket per frame
+                    if args.sort:
+                        for p in frame_pockets:
+                            frames.append(i)
+                            pockets.append([p])
+
+                    # If the args.extract is active, the element is added only if at least one pocket was found
+                    elif not args.extract or len(frame_pockets) > 0:
                         frames.append(i)
-                        pockets.append([p])
-
-                # If the args.extract is active, the element is added only if at least one pocket was found
-                elif not args.extract or len(frame_pockets) > 0:
-                    frames.append(i)
-                    pockets.append(frame_pockets)
-        
-            # Complete the progress writing the total number of frames analyzed
-            if i >= 10 and not args.quiet:
-                print(f'{" ".join(map(str, structures))} {i} frames', end='\n')
+                        pockets.append(frame_pockets)
 
             # Sort the pockets
-            if args.sort:
+            if args.sort and frames and pockets:
                 frames, pockets = zip(*sorted(zip(frames, pockets), key=lambda fp: PocketEvaluator.evaluate(args.sort, fp[1][0], atoms), reverse=True))
 
             # Define the output folder for this chunk using the stem name of the 

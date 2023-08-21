@@ -12,7 +12,8 @@ dynamic = ["version"]
 dependencies = [
     "numpy",
     "numba",
-    "mdanalysis"
+    "mdanalysis",
+    "rich"
 ]
 
 [project.urls]
