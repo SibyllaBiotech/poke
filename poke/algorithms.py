@@ -6,15 +6,16 @@ def compute_low_resolution_grid(energy_map: np.ndarray, grid_cutoff: float,
                  neighbours: np.ndarray, grid_positions: np.ndarray, 
                  probe_sigmas2: np.ndarray, probe_epsilons: np.ndarray, sigma_charges: np.ndarray):
     """
-        Compute the low-resolution energy_map and build the  neighbours lists.
-        In the low-resolution energy_map only the values energy_map[::4,::4,::4] are computed.
-        The remaining values are kept unchanged.
+        Compute the low-resolution energy_map and build the neighbours lists.
+        In the low-resolution energy_map, only energy_map[::4,::4,::4] values 
+        are calculated, while the rest remain unchanged.
+        
+        For each point in the low-resolution grid, a list of neighboring atoms is built in the
+        neighbours ndarray. The neighbours array must have a quarter of the dimensions of the grid.
+        The list begins with the number of neighbors, followed by the atoms' indexes. 
 
-        For each point in the low-resolution grid a list of neighbour atoms is build in the
-        neighbours ndarray. The neighbours array must have a quarter of the shapes of the grid.
-        The first value in the list is the number of neighbours, the following are the indexes of the atoms.
-
-        The sigma_charges are the charge values transformed to be used with distances in unit of measure of sigma.
+        The sigma_charges refer to the charge values which have been transformed to be used with 
+        the distances measured in units of sigma.
     """
 
     # Set to zero the values of the map that will be computed
@@ -23,11 +24,11 @@ def compute_low_resolution_grid(energy_map: np.ndarray, grid_cutoff: float,
     # Precompute the cutoff squared. It will be used in the hot-cycle 
     grid_cutoff2 = grid_cutoff * grid_cutoff
 
-    # For each atom, its potential will be added in the neighbour cells.
-    # At the same time the index of the atom will be added in the neighbours lists.
+    # For each atom, its potential will be added to the neighbour cells.
+    # At the same time the index of the atom will be added to the neighbours lists.
     for i in range(grid_positions.shape[0]):
 
-        # Van de Walls composition rules between the atom and the probe
+        # Van der Waals composition rules between the atom and the probe
         charge = sigma_charges[i]
         sigma2 = probe_sigmas2[i]
         epsilon = probe_epsilons[i]
@@ -45,7 +46,8 @@ def compute_low_resolution_grid(energy_map: np.ndarray, grid_cutoff: float,
         max_ky = np.int32(min(ny+grid_cutoff, energy_map.shape[1]) * 0.25 + 0.5) << 2
         max_kz = np.int32(min(nz+grid_cutoff, energy_map.shape[2]) * 0.25 + 0.5) << 2
 
-        # The step of 4 needs to match the low-resolution grid
+        # Use a value of 4 to match the step of the low-resolution grid,
+        # as it's one-fourth the resolution of the original grid.
         for kx in range(min_kx, max_kx, 4):
             kx4 = kx >> 2 
             dx2 = (kx-nx)*(kx-nx)
@@ -73,7 +75,7 @@ def compute_low_resolution_grid(energy_map: np.ndarray, grid_cutoff: float,
                     ir12 = ir6*ir6
 
                     # Add the atom in the neighbours list
-                    # of this point in the grid                       
+                    # for this grid point                       
                     n_neighbours = neighbours[kx4,ky4,kz4,0]
                     i_neighbour = n_neighbours + 1
                     if i_neighbour < neighbours.shape[3]:
@@ -93,25 +95,25 @@ def enhance_volumes(energy_map: np.ndarray, isovalue: float,
                     neighbours: np.ndarray, grid_positions: np.ndarray,
                     probe_sigmas2: np.ndarray, probe_epsilons: np.ndarray, sigma_charges: np.ndarray):
     '''
-        Expand the low-energy regions found in the low-resolution map. The expansion is done 
-        on the high-resolution map computing the potential in the missing positions.
-        This function return the set of points under a threshold of total energy.
+        Expand the low-energy regions found in the low-resolution map. This expansion is 
+        carried out on the high-resolution map by computing the potential in the missing positions.
+        This function returns the set of points that fall below a certain threshold of total energy.
     '''
-    # Points that have already been inserted in pockets_points
+    # To store the points that will be included in pockets_points
     inserted = np.zeros((energy_map.shape[0], energy_map.shape[1], energy_map.shape[2]), dtype=np.uint16)
 
-    # Create lists of points, one for each pocket 
+    # Create lists of points, each corresponding to a specific pocket 
     pockets_points = np.empty((energy_map.size, 3), dtype=np.int16) # 65536 maximum dimension of the grid along each axis
     surfaces_points = np.empty((energy_map.size // 2, 3), dtype=np.int16) 
 
-    # For each pocket, mark the beginning of the volume/surface points array (excluding the first one, which starts in zero)
-    # these serve as slicers of the pocket_points and surface_points arrays, avoids computation of the sum of the volumes array
-    # example [17,69,666] can be used as pockets_points[17:69] to extract the points belonging to the second pocket
+    # For each pocket, mark the starting index of the volume/surface points array (excluding the first one, which starts at zero).
+    # These are used as slicers for the pocket_points and surface_points arrays, eliminating the need to computate the sum of the volumes array.
+    # Example: the indices [17,69,666] can be used as pockets_points[17:69] to extract the points belonging to the second pocket.
     pockets_slicer  = np.zeros(65536, dtype=np.uint32)
     surfaces_slicer = np.zeros(65536, dtype=np.uint32)
 
     # Pocket counter, needed for ids
-    # This also serves to keep track of the boundaries of the volumes and surfaces arrays
+    # This is also used to keep track of the boundaries of volumes and surfaces arrays
     n_pockets = 0
 
     n_visited = 0
@@ -142,15 +144,15 @@ def enhance_volumes(energy_map: np.ndarray, isovalue: float,
                         
                         n_internal_faces = 0
 
-                        # Compute the energies of the near points 
-                        # that will be used in the following ifs
+                        # Compute the energies of nearby points 
+                        # that will be used in the following if clauses
                         energy_xp, energy_xm, energy_yp, energy_ym, energy_zp, energy_zm = \
                             compute_star_points(px,py,pz, energy_map, 
                                             neighbours, grid_positions, 
                                             probe_sigmas2, probe_epsilons, sigma_charges)
                         
-                        # Decide which points are under the threshold and
-                        # must be added in the returning lists
+                        # Decide which points are below the threshold and
+                        # must be added to the returning lists
                         if energy_xp < isovalue:
                             n_internal_faces += 1
                             if not inserted[px+1,py,pz]:
@@ -215,7 +217,7 @@ def compute_star_points(px: int, py: int, pz: int, energy_map: np.ndarray,
                         probe_sigmas2: np.ndarray, probe_epsilons: np.ndarray, sigma_charges: np.ndarray):
     '''
         Compute the potential of the 6 points around the central point (px, py, pz).
-        The computation take in consideration only the atoms in the neighbour list.
+        The computation only takes into consideration the atoms present in the neighbours list.
     '''
 
     # Fetch energy values from the map
@@ -228,7 +230,7 @@ def compute_star_points(px: int, py: int, pz: int, energy_map: np.ndarray,
     energy_zp = energy_map[px,py,pz+1,0] if pz+1 < energy_map.shape[2] else 1000
     energy_zm = energy_map[px,py,pz-1,0] if pz > 0 else 1000
 
-    # Checks if those values were never been computed    
+    # Check whether those values have not been previously calculated    
     compute_xp, energy_xp, elec_xp = (True, 0, 0) if energy_xp == 100 else (False, energy_xp, 0) 
     compute_xm, energy_xm, elec_xm = (True, 0, 0) if energy_xm == 100 else (False, energy_xm, 0) 
     compute_yp, energy_yp, elec_yp = (True, 0, 0) if energy_yp == 100 else (False, energy_yp, 0) 
@@ -245,7 +247,7 @@ def compute_star_points(px: int, py: int, pz: int, energy_map: np.ndarray,
     for i_neighbour in range(n_neighbours):
         i = i_neighbours[i_neighbour]
 
-        # Van de Walls composition rules between the atom and the probe
+        # Van der Waals composition rules between the atom and the probe
         charge = sigma_charges[i]
         sigma2 = probe_sigmas2[i]
         epsilon = probe_epsilons[i]
@@ -262,7 +264,7 @@ def compute_star_points(px: int, py: int, pz: int, energy_map: np.ndarray,
         r2 = px_nx*px_nx + py_ny*py_ny + pz_nz*pz_nz + 1.002
 
         # Add the energy contribution of this atom 
-        # on the 6 points around
+        # to the 6 points around
         if compute_xp:
             ir2 = sigma2 / (r2 + 2 * px_nx)
             ir6 = ir2*ir2*ir2
@@ -349,7 +351,7 @@ def compute_real_elec(points: np.ndarray, positions: np.ndarray, charges: np.nda
 @nb.njit(cache=True, fastmath=True)
 def intersect_box(box1: np.ndarray, box2: np.ndarray, threshold: float):
     ''' 
-        Return true if box1 and box2 have an intersection.
+        Return true if there is an intersection between box1 and box2
     '''
     return (box1[0,0] - threshold < box2[1,0] and box1[1,0] + threshold > box2[0,0] and
             box1[0,1] - threshold < box2[1,1] and box1[1,1] + threshold > box2[0,1] and
@@ -358,8 +360,8 @@ def intersect_box(box1: np.ndarray, box2: np.ndarray, threshold: float):
 @nb.njit(cache=True, fastmath=True)   
 def is_reachable(points1, points2, threshold, grid_positions, probe_sigmas2, neighbours):
     '''
-        Return True if exists a segment shorter than threshold that connects points1 with points2
-        without crossing a barrier in the energy_map higher than max_barrier. 
+        Return True if there is a segment shorter than the threshold connecting 
+        points1 with points2, and this segment does not intersect any atom. 
     '''
     threshold2 = threshold**2
 
@@ -383,7 +385,7 @@ def is_reachable(points1, points2, threshold, grid_positions, probe_sigmas2, nei
                 # a barrier in the energy map. 
                 max_delta = max(np.abs(dx),np.abs(dy),np.abs(dz))
 
-                # Rescale the direction vector making equal to 1 the largest coordinate
+                # Rescale the direction vector making the largest coordinate equal to 1 
                 # It's an equivalent version of the Bresenham's line algorithm
                 slope_x = dx / max_delta
                 slope_y = dy / max_delta
@@ -407,12 +409,12 @@ def is_reachable(points1, points2, threshold, grid_positions, probe_sigmas2, nei
                     for i_neighbour in range(n_neighbours):
                         i = i_neighbours[i_neighbour]
 
-                        # Fetch the atom position on the grid coordinates
+                        # Retrieve the atom's position in grid coordinates
                         nx = grid_positions[i,0]
                         ny = grid_positions[i,1]
                         nz = grid_positions[i,2]
 
-                        # Van de Walls composition rules between the atom and the probe
+                        # Van der Waals composition rules between the atom and the probe
                         sigma2 = probe_sigmas2[i]
 
                         px_nx = px-nx
@@ -421,39 +423,40 @@ def is_reachable(points1, points2, threshold, grid_positions, probe_sigmas2, nei
 
                         r2 = px_nx*px_nx + py_ny*py_ny + pz_nz*pz_nz
 
-                        # Is this atom intesected?
+                        # Does the line intersect the atom?
                         if r2 < 0.8 * sigma2:
                             good = False
                             break
 
-                    # We don't need to continue on this segment
-                    # we can short-circuit and continue to the next
+                    # There is no need to proceed with this segment 
+                    # if the line intersects the atom.
+                    # we can skip and move on to the next segment.
                     if not good:
                         break
                 
-                # An entire line has been completed without 
-                # intersecting any atoms? So the regions are connected!
+                # If the entire line has been traversed without intersecting any atoms, 
+                # then the regions are connected.
                 if good:
                     return True
     
-    # Connecting the regions was not be possible
+    # Connecting the regions was unfeasible
     return False
 
 
 @nb.njit(cache=True, fastmath=True)   
 def get_region_atoms(points, neighbours, grid_positions, k_nearest):
     '''
-        For each point of the region, this function find the k-nearest atoms.
+        This Function identifies the k-nearest atoms for every point within the region.
         After collecting all the atoms for each point, it returns the unique sorted list.
     '''
     atoms = set()
 
-    # Accumulation vector for computing the enclosure
+    # Vector used to accumulate data to compute the enclosure
     net_vector = np.zeros(shape=3, dtype=np.float32)
     net_count = 0
 
     # These arrays are used multiple times to store the k-nearest atoms
-    # for each atom. The atoms are collected using a insert sort 
+    # for each atom. Atoms collection is achieved through an insertion sort 
     # using these arrays
     k_r2 = np.empty(k_nearest, dtype=np.float32)
     k_i  = np.empty(k_nearest, dtype=np.int32)
@@ -495,12 +498,13 @@ def get_region_atoms(points, neighbours, grid_positions, k_nearest):
                 k_i[k-1] = i
                 k_r2[k-1] = r2
 
-        # Dump the k-nearest arrays into the atoms set
+        # Transfer the k-nearest arrays into the set of atoms
         for i in range(k_i.shape[0]):
             if k_i[i] != -1:
                 atoms.add(k_i[i])
 
-                # Add to the accumulation vector the vector from the pocket point to the atom              
+                # Update the accumulation vector with the 
+                # vector from the pocket point to the atom              
                 net_vector += grid_positions[k_i[i]] - points[p]
                 net_count += 1
                 
