@@ -12,8 +12,8 @@ from .algorithms import compute_low_resolution_grid, enhance_volumes, \
 class Poke:
     def __init__(self, spacing: float=0.5, cutoff: float=7.5, 
                  electro_force: float=1120, probe_sigma: float=3.8,
-                 energy_threshold: float=-14.5, min_body_volume: float=20, 
-                 min_spot_volume: float=2.7, max_bulk_distance: float=2.0, 
+                 energy_threshold: float=-14.5, min_volume: float=30, 
+                 min_spot_volume: float=2.7, max_bulk_distance: float=1.8, 
                  max_spot_distance: float=3.6):
         '''
         Poke object found drugguable pockets.
@@ -61,7 +61,7 @@ class Poke:
         self.electro_force = electro_force
         self.probe_sigma = probe_sigma
         self.energy_threshold = energy_threshold
-        self.min_body_points = min_body_volume * self.inverse_spacing**3
+        self.min_points = min_volume * self.inverse_spacing**3
         self.min_spot_points = min_spot_volume * self.inverse_spacing**3
         self.max_bulk_distance = max_bulk_distance * self.inverse_spacing
         self.max_spot_distance = max_spot_distance * self.inverse_spacing
@@ -225,49 +225,56 @@ class Poke:
             The spots that are near a body will be added to it.
             For each body + near spots a Pocket object will be returned.
         '''
-        big_regions: set[Region] = set()
-        small_regions: set[Region] = set()
+        # big_regions: set[Region] = set()
+        # small_regions: set[Region] = set()
+        regions1 = set(regions)
+        regions2 = regions1.copy()
         grouped_regions: list[list[Region]] = []
 
         # Divide the regions in big regions (bodies) and small regions (spots)
-        for r in regions:
-            (big_regions if r.volume >= self.min_body_points else small_regions).add(r)
+        # for r in regions:
+        #     (big_regions if r.volume >= self.min_body_points else small_regions).add(r)
         
         # Merge big regions in groups if they are close enough
-        while big_regions:
-            group = [big_regions.pop()]
+        while regions1:
+            group = [regions1.pop()]
             stack = {group[0]}
             while stack:
                 r1 = stack.pop()
-                for r2 in list(big_regions):
+                for r2 in list(regions1):
                     if intersect_box(r1.box, r2.box, self.max_bulk_distance):
                         if is_reachable(r1.surface_points, r2.surface_points, self.max_bulk_distance, 
                                     self.grid_positions, self.probe_sigmas2, self.neighbours):
-                            big_regions.remove(r2)
+                            regions1.remove(r2)
                             group.append(r2)
                             stack.add(r2)
 
             grouped_regions.append(group)
-
 
         # Add small regions around the big ones and build the pockets
         pockets = []
         for br_group in grouped_regions:
             volume_points = []
             surface_points = []
-            small_regions_tmp = small_regions.copy()
+            regions2_tmp = regions2.copy()
+            for br in br_group:
+                regions2_tmp.remove(br)
+            
             for br in br_group:
                 volume_points.append(br.volume_points)
                 surface_points.append(br.surface_points)
-                for sr in list(small_regions_tmp):
+                for sr in list(regions2_tmp):
                     if intersect_box(br.box, sr.box, self.max_spot_distance):
                          if is_reachable(br.surface_points, sr.surface_points, self.max_spot_distance, 
                                          self.grid_positions, self.probe_sigmas2, self.neighbours):
                             volume_points.append(sr.volume_points)
                             surface_points.append(sr.surface_points)
-                            small_regions_tmp.remove(sr)
+                            regions2_tmp.remove(sr)
             
-            pockets.append(self.compute_descriptors(volume_points, surface_points))
+            volume_points = np.concatenate(volume_points)
+            if volume_points.shape[0] >= self.min_points:
+                surface_points = np.concatenate(surface_points)
+                pockets.append(self.compute_descriptors(volume_points, surface_points))
 
         return pockets
 
@@ -285,11 +292,11 @@ class Poke:
                     Points on the surface of the same region
                     
         '''
-        n_regions = len(volume_points)
+        # n_regions = len(volume_points)
 
         # Concatenate the list of points
-        volume_points = np.concatenate(volume_points)
-        surface_points = np.concatenate(surface_points)
+        # volume_points = np.concatenate(volume_points)
+        # surface_points = np.concatenate(surface_points)
 
         # Compute the list of the atoms surrounding the pocket
         atoms, net_vector = get_region_atoms(surface_points, self.neighbours, self.grid_positions, k_nearest=int(20 * self.spacing**2 + 0.5))
