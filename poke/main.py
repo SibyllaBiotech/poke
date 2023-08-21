@@ -7,7 +7,7 @@ import pickle
 from pathlib import Path
 
 from poke import Poke, Pocket
-from poke.filter import PocketFilter
+from poke.filter import PocketEvaluator
 from poke.writer import PocketWriter
 from MDAnalysis import Universe, AtomGroup, Writer
 
@@ -32,8 +32,12 @@ def main():
                         'compute the descriptors and save them in a csv file.')
     parser.add_argument('-v', '--volumes', action='store_true', default=False, help=
                         'save the volumes and save them in a multi-model PDB file.')
+    parser.add_argument('-a', '--atoms', type=str, metavar='', default='all', help=
+                        'selection of atoms used by the scouter.')
     parser.add_argument('-e', '--extract', action='store_true', default=False, help=
                         'save the results relative to a new trajectory containing only frames with at least one pocket.')
+    parser.add_argument('-s', '--sort', type=str, metavar='', default='all', help=
+                        'selection of atoms used by the scouter.')
     parser.add_argument('-p', '--pymol', action='store_true', default=False, help=
                         'save a pymol script usable to open the pockets found.')
     parser.add_argument('-k', '--pickle', action='store_true', default=False, help=
@@ -53,16 +57,17 @@ def main():
 
             # Suppress the warning during the opening of the structures
             u = Universe(*structures)
-            atoms = u.atoms
+            atoms = u.select_atoms(args.atoms)
 
             # Initialize the scouter with the atoms 
             scouter = Poke().load_atoms_properties_from_mdanalysis(atoms)
+            
             frames = []
             pockets = []
             
             # Run the scouter for each frame
             for i, ts in enumerate(u.trajectory):
-                frame_pockets = scouter.get_pockets(ts.positions)
+                frame_pockets = scouter.get_pockets(atoms.positions)
 
                 # When there are many frame write a progress if not quiet
                 if i >= 10 and i % 10 == 0 and not args.quiet:
@@ -70,17 +75,26 @@ def main():
                 
                 # Apply a filter to the pockets evaluating the args.filter on each pocket
                 if args.filter is not None:
-                    frame_pockets = [p for p in frame_pockets if PocketFilter.evaluate(args.filter, p, atoms)]
+                    frame_pockets = [p for p in frame_pockets if PocketEvaluator.evaluate(args.filter, p, atoms)]
 
-                # Add one element to the lists (the frame analysed and the pockets found)
+                # If sorting is active only the trajectory will be written with only one pocket per frame
+                if args.sort:
+                    for p in frame_pockets:
+                        frames.append(i)
+                        pockets.append([p])
+
                 # If the args.extract is active, the element is added only if at least one pocket was found
-                if not args.extract or len(frame_pockets) > 0: 
+                elif not args.extract or len(frame_pockets) > 0:
                     frames.append(i)
                     pockets.append(frame_pockets)
-            
+        
             # Complete the progress writing the total number of frames analyzed
             if i >= 10 and not args.quiet:
-                print(f'{" ".join(map(str, structures))} {i} frames', end='\r')
+                print(f'{" ".join(map(str, structures))} {i} frames', end='\n')
+
+            # Sort the pockets
+            if args.sort:
+                frames, pockets = zip(*sorted(zip(frames, pockets), key=lambda fp: PocketEvaluator.evaluate(args.sort, fp[1][0], atoms), reverse=True))
 
             # Define the output folder for this chunk using the stem name of the 
             # first structure in the chunk that usually is the reference (.pdb / .gro)
@@ -89,8 +103,8 @@ def main():
 
             # If args.extract is set, write a new trajectory with all
             # the frames collected in the list (with at least a pocket)
-            if args.extract:
-                write_coordinates(out_dir, u, frames)
+            if args.extract or args.sort:
+                write_coordinates(out_dir, atoms, frames)
 
             if args.descriptors:
                 write_desciptors(out_dir, atoms, pockets, frames)
@@ -99,14 +113,12 @@ def main():
                 if args.extract:
                     # If the args.extract flag is active the pymol script needs a 
                     # trajectory with only the frames written by write_coordinates
-                    write_points(args, out_dir, [structures[0], out_dir / 'frames.xtc'], pockets)
+                    write_points(args, out_dir, [out_dir / 'structure.pdb', out_dir / 'frames.xtc'], pockets)
                 else:
                     write_points(args, out_dir, structures, pockets)
 
             if args.pickle:
                 write_pickle(args, out_dir, pockets)
-
-            
         
     except UserError as error:
         print(error)    
@@ -141,15 +153,18 @@ def split_structures(structures: list[Path]):
     if output_list:
         yield output_list
 
-def write_coordinates(out_dir, u: Universe, frames: list[int]):
+def write_coordinates(out_dir, atoms: AtomGroup, frames: list[int]):
     '''
         Write an xtc trajectory with a subset of 
         the frames specified in the list frames.
     '''
+    atoms.universe.trajectory[0]
+    atoms.write(str(out_dir / 'structure.pdb'))
+
     with Writer(str(out_dir / 'frames.xtc'), multiframe=True) as stream:
         for frame in frames:
-            u.trajectory[frame]
-            stream.write(u.atoms)
+            atoms.universe.trajectory[frame]
+            stream.write(atoms)
 
 def write_desciptors(out_dir, atoms: AtomGroup, pockets: list[Pocket], frames: list[int]):
     '''
