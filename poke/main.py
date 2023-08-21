@@ -51,6 +51,12 @@ def main():
                         'compress the results using gzip, most of the programs can read them without problem.')
     args = parser.parse_args()
 
+    # Precompile filter and sort expressions
+    if args.filter:
+        args.filter = compile(args.filter, __file__, 'eval')
+    if args.sort:
+        args.sort = compile(args.sort, __file__, 'eval')
+
     try:
         # args.structures contains all the inputs in sequence
         # split_structures produce a iterator of chunks to be passed to the Universe constructor
