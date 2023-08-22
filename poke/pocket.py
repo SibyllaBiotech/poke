@@ -1,7 +1,4 @@
-import pickle
 import numpy as np
-
-from pathlib import Path
 
 class Pocket:
     '''
@@ -10,12 +7,6 @@ class Pocket:
         an origin and a spacing. Electrostatic potential for each point is 
         present.              
     '''
-
-    # Machine learning model to score 
-    # the pocket starting from descriptors
-    scoring_model = None
-
-
     def __init__(self, origin: np.ndarray, spacing: np.ndarray, 
                  volume_points: np.ndarray, surface_points: np.ndarray, 
                  energy: np.ndarray, electro: np.ndarray,
@@ -35,7 +26,7 @@ class Pocket:
         self.enclosure = enclosure
         self.n_apolar_atoms, self.n_polar_atoms, self.n_charges_atoms = np.histogram(np.abs(charges), bins=[0, 0.3, 0.7, 10])[0]
         self.hydrophobicity = self.n_apolar_atoms / self.atoms.shape[0]
-        self.score = self.compute_score()
+        self.score = None
 
     @property
     def volume_unit(self) -> float:
@@ -172,12 +163,6 @@ class Pocket:
             '#PolarAtoms': self.n_polar_atoms, 
             '#ChargedAtoms': self.n_charges_atoms,
         }
-    
-    def compute_score(self):
-        if self.scoring_model is None:
-            model_path = Path(__file__).parent / 'model.pickle'
-            self.scoring_model = pickle.loads(model_path.read_bytes())
-        return self.scoring_model(np.array(self.features()))[0]
 
     def __repr__(self) -> str:
         return f'<Pocket volume={self.volume:.1f} #atoms={len(self.atoms)}>'

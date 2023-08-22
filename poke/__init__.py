@@ -3,8 +3,10 @@
 __version__ = "0.0.1"
 
 import os
+import pickle
 import numpy as np
 
+from pathlib import Path
 from .pocket import Pocket
 from .algorithms import compute_low_resolution_grid, enhance_volumes, \
                         intersect_box, is_reachable, get_region_atoms
@@ -83,6 +85,7 @@ class Poke:
         self.energy_map: np.ndarray = None
 
         self.parametrizer = None
+        self.scoring_model = pickle.loads((Path(__file__).parent / 'model.pickle').read_bytes())
 
     def load_atoms_properties(self, charges: np.ndarray, sigmas: np.ndarray, epsilons: np.ndarray) -> 'Poke':
         '''
@@ -320,9 +323,13 @@ class Poke:
         spacing_matrix = np.diag(np.full(3, self.spacing, dtype=np.float32))
 
         # Create a pocket with the computed properties
-        return Pocket(self.origin, spacing_matrix, volume_points=volume_points, 
+        pocket = Pocket(self.origin, spacing_matrix, volume_points=volume_points, 
                       surface_points=surface_points, energy=energy, electro=electro, 
                       atoms=atoms, charges=charges, lengths=lengths, enclosure=enclosure)
+
+        # Compute the score
+        pocket.score = self.scoring_model(np.array(pocket.features()))[0]
+        return pocket
 
 
     def write_bulk_map(self, out: os.PathLike):
