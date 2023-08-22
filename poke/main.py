@@ -5,6 +5,7 @@ import argparse
 import warnings
 import pickle
 from pathlib import Path
+from multiprocessing import Pool
 
 from poke import Poke, Pocket
 from poke.filter import PocketEvaluator
@@ -52,6 +53,7 @@ def main():
                         'filter the pockets with a condition.')
     parser.add_argument('-z', '--compress', action='store_true', default=False, help=
                         'compress the results using gzip, most of the programs can read them without problem.')
+    parser.add_argument('-nc','--ncores', type=int, metavar='', default=1, help='number of cores used to parallelize the computation of trajectories or multimodel pdb files')
     args = parser.parse_args()
 
     # Precompile filter and sort expressions
@@ -98,27 +100,29 @@ def main():
                 n_pockets = 0
             
                 # Run the scouter for each frame
-                for i, ts in enumerate(u.trajectory):
-                    frame_pockets = scouter.get_pockets(atoms.positions)
-                    n_pockets += len(frame_pockets)
+                with Pool(processes=args.ncores) as pool: 
+                    iter_frames_pockets = pool.imap(scouter.get_pockets, (atoms.positions for _ in u.trajectory), chunksize=100)
 
-                    # Apply a filter to the pockets evaluating the args.filter on each pocket
-                    if args.filter is not None:
-                        frame_pockets = [p for p in frame_pockets if PocketEvaluator.evaluate(args.filter, p, atoms)]
-                    n_kept_pockets += len(frame_pockets)
+                    for i, frame_pockets in enumerate(iter_frames_pockets):
+                        n_pockets += len(frame_pockets)
 
-                    # If sorting is active only the trajectory will be written with only one pocket per frame
-                    if args.sort:
-                        for p in frame_pockets:
+                        # Apply a filter to the pockets evaluating the args.filter on each pocket
+                        if args.filter is not None:
+                            frame_pockets = [p for p in frame_pockets if PocketEvaluator.evaluate(args.filter, p, atoms)]
+                        n_kept_pockets += len(frame_pockets)
+
+                        # If sorting is active only the trajectory will be written with only one pocket per frame
+                        if args.sort:
+                            for p in frame_pockets:
+                                frames.append(i)
+                                pockets.append([p])
+
+                        # If the args.extract is active, the element is added only if at least one pocket was found
+                        elif not args.extract or len(frame_pockets) > 0:
                             frames.append(i)
-                            pockets.append([p])
+                            pockets.append(frame_pockets)
 
-                    # If the args.extract is active, the element is added only if at least one pocket was found
-                    elif not args.extract or len(frame_pockets) > 0:
-                        frames.append(i)
-                        pockets.append(frame_pockets)
-
-                    progress_bar.update(task, advance=1, n_kept_pockets=n_kept_pockets, n_pockets=n_pockets)
+                        progress_bar.update(task, advance=1, n_kept_pockets=n_kept_pockets, n_pockets=n_pockets)
 
             # Sort the pockets
             if args.sort and frames and pockets:
