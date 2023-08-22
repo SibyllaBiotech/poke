@@ -12,11 +12,13 @@ from .algorithms import compute_low_resolution_grid, enhance_volumes, \
                         intersect_box, is_reachable, get_region_atoms
 
 class Poke:
+    scoring_models = {}
+
     def __init__(self, spacing: float=0.5, cutoff: float=7.5, 
                  electro_force: float=1120, probe_sigma: float=3.8,
                  energy_threshold: float=-14.5, min_volume: float=30, 
                  min_spot_volume: float=2.7, max_bulk_distance: float=1.8, 
-                 max_spot_distance: float=3.6):
+                 max_spot_distance: float=3.6, scoring_model: str='model'):
         '''
         Poke object found drugguable pockets.
         Atom properties must be provided using one of the methods available.
@@ -85,7 +87,10 @@ class Poke:
         self.energy_map: np.ndarray = None
 
         self.parametrizer = None
-        self.scoring_model = pickle.loads((Path(__file__).parent / 'model.pickle').read_bytes())
+
+        if scoring_model not in Poke.scoring_models:
+            Poke.scoring_models[scoring_model] = pickle.loads((Path(__file__).parent / f'{scoring_model}.pickle').read_bytes())
+        self.scoring_model = Poke.scoring_models[scoring_model]
 
     def load_atoms_properties(self, charges: np.ndarray, sigmas: np.ndarray, epsilons: np.ndarray) -> 'Poke':
         '''
