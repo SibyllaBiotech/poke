@@ -10,6 +10,7 @@ from multiprocessing import Pool
 from poke import Poke, Pocket
 from poke.filter import PocketEvaluator
 from poke.writer import PocketWriter
+
 from MDAnalysis import Universe, AtomGroup, Writer
 from rich import progress
 from rich.text import Text
@@ -53,7 +54,8 @@ def main():
                         'filter the pockets with a condition.')
     parser.add_argument('-z', '--compress', action='store_true', default=False, help=
                         'compress the results using gzip, most of the programs can read them without problem.')
-    parser.add_argument('-nc','--ncores', type=int, metavar='', default=1, help='number of cores used to parallelize the computation of trajectories or multimodel pdb files')
+    parser.add_argument('-nc','--ncores', type=int, metavar='', default=None, help=
+                        'number of cores used to parallelize the computation of trajectories or multimodel pdb files')
     args = parser.parse_args()
 
     # Precompile filter and sort expressions
@@ -99,9 +101,20 @@ def main():
                 n_kept_pockets = 0
                 n_pockets = 0
             
-                # Run the scouter for each frame
+                # Set number of cores, if not provided by user
+                # Criteria: 
+                # - if trajectory is short, ensure at least 8 frames for each core
+                # - for longer trajectories, ensure the number of cores does not exceed available cores,
+                #   up to a maximum of 32
+                if args.ncores is None:
+                    args.ncores = max(1, min(32, os.cpu_count(), u.trajectory.n_frames // 8))
+
+                # Set chunksize accordingly 
+                # for low number of cores, chunksize is smaller to update progress bar more frequently
+                chunksize = max(12, min(u.trajectory.n_frames // args.ncores, args.ncores*8))
+
                 with Pool(processes=args.ncores) as pool: 
-                    iter_frames_pockets = pool.imap(scouter.get_pockets, (atoms.positions for _ in u.trajectory), chunksize=100)
+                    iter_frames_pockets = pool.imap(scouter.get_pockets, (atoms.positions for _ in u.trajectory), chunksize=chunksize)
 
                     for i, frame_pockets in enumerate(iter_frames_pockets):
                         n_pockets += len(frame_pockets)
@@ -121,8 +134,11 @@ def main():
                         elif not args.extract or len(frame_pockets) > 0:
                             frames.append(i)
                             pockets.append(frame_pockets)
-
-                        progress_bar.update(task, advance=1, n_kept_pockets=n_kept_pockets, n_pockets=n_pockets)
+                        
+                        if (i+1) % chunksize == 0:
+                            progress_bar.update(task, advance=chunksize, n_kept_pockets=n_kept_pockets, n_pockets=n_pockets)
+                
+                progress_bar.update(task, completed=u.trajectory.n_frames, n_kept_pockets=n_kept_pockets, n_pockets=n_pockets)
 
             # Sort the pockets
             if args.sort and frames and pockets:
