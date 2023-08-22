@@ -1,7 +1,7 @@
 from .pocket import Pocket
 from MDAnalysis import AtomGroup
 
-class PocketFilter:
+class PocketEvaluator:
     def __init__(self, pocket: Pocket, atoms: AtomGroup):
         self.pocket = pocket
         self.atoms = atoms
@@ -34,6 +34,6 @@ class PocketFilter:
         return intersection / (intersection + a*diff1 + b*diff2)
 
     def evaluate(expr, pocket, atoms):
-        return eval(expr, globals(), PocketFilter(pocket, atoms))
+        return eval(expr, globals(), PocketEvaluator(pocket, atoms))
     
 
