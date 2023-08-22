@@ -39,8 +39,8 @@ def main():
                         'selection of atoms used by the scouter.')
     parser.add_argument('-e', '--extract', action='store_true', default=False, help=
                         'save the results relative to a new trajectory containing only frames with at least one pocket.')
-    parser.add_argument('-s', '--sort', type=str, metavar='', default='all', help=
-                        'selection of atoms used by the scouter.')
+    parser.add_argument('-s', '--sort', type=str, metavar='', default=None, help=
+                        'sorting by the value of an expression.')
     parser.add_argument('-n', '--max-pockets', type=int, metavar='', default=None, help=
                         'maximum number of pocket in the output. Only when --sort is used.')
     parser.add_argument('-p', '--pymol', action='store_true', default=False, help=
