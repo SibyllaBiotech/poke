@@ -1,7 +1,7 @@
 import numpy as np
 import numba as nb
 
-@nb.njit(cache=True, fastmath=True)
+@nb.njit(cache=True, fastmath=True, nogil=True)
 def compute_low_resolution_grid(energy_map: np.ndarray, grid_cutoff: float, 
                  neighbours: np.ndarray, grid_positions: np.ndarray, 
                  probe_sigmas2: np.ndarray, probe_epsilons: np.ndarray, sigma_charges: np.ndarray):
@@ -90,7 +90,7 @@ def compute_low_resolution_grid(energy_map: np.ndarray, grid_cutoff: float,
     # energy_map[::4,::4,::4, 0] -= np.abs(energy_map[::4,::4,::4, 1])
 
 
-@nb.njit(cache=True, fastmath=True)
+@nb.njit(cache=True, fastmath=True, nogil=True)
 def enhance_volumes(energy_map: np.ndarray, isovalue: float, 
                     neighbours: np.ndarray, grid_positions: np.ndarray,
                     probe_sigmas2: np.ndarray, probe_epsilons: np.ndarray, sigma_charges: np.ndarray):
@@ -211,7 +211,7 @@ def enhance_volumes(energy_map: np.ndarray, isovalue: float,
                       surfaces_points[:n_surfaces], surfaces_slicer[:n_pockets+1])
 
 
-@nb.njit(cache=True, fastmath=True)
+@nb.njit(cache=True, fastmath=True, nogil=True)
 def compute_star_points(px: int, py: int, pz: int, energy_map: np.ndarray,
                         neighbours: np.ndarray, grid_positions: np.ndarray, 
                         probe_sigmas2: np.ndarray, probe_epsilons: np.ndarray, sigma_charges: np.ndarray):
@@ -336,7 +336,7 @@ def compute_star_points(px: int, py: int, pz: int, energy_map: np.ndarray,
 
     return energy_xp, energy_xm, energy_yp, energy_ym, energy_zp, energy_zm
 
-@nb.njit(cache=True, fastmath=True)
+@nb.njit(cache=True, fastmath=True, nogil=True)
 def compute_real_elec(points: np.ndarray, positions: np.ndarray, charges: np.ndarray):
     elec = np.empty(points.shape[0])
     for i in range(points.shape[0]):
@@ -348,7 +348,7 @@ def compute_real_elec(points: np.ndarray, positions: np.ndarray, charges: np.nda
 
     
 
-@nb.njit(cache=True, fastmath=True)
+@nb.njit(cache=True, fastmath=True, nogil=True)
 def intersect_box(box1: np.ndarray, box2: np.ndarray, threshold: float):
     ''' 
         Return true if there is an intersection between box1 and box2
@@ -357,7 +357,7 @@ def intersect_box(box1: np.ndarray, box2: np.ndarray, threshold: float):
             box1[0,1] - threshold < box2[1,1] and box1[1,1] + threshold > box2[0,1] and
             box1[0,2] - threshold < box2[1,2] and box1[1,2] + threshold > box2[0,2])
 
-@nb.njit(cache=True, fastmath=True)   
+@nb.njit(cache=True, fastmath=True, nogil=True)   
 def is_reachable(points1, points2, threshold, grid_positions, probe_sigmas2, neighbours):
     '''
         Return True if there is a segment shorter than the threshold connecting 
@@ -443,7 +443,7 @@ def is_reachable(points1, points2, threshold, grid_positions, probe_sigmas2, nei
     return False
 
 
-@nb.njit(cache=True, fastmath=True)   
+@nb.njit(cache=True, fastmath=True, nogil=True)   
 def get_region_atoms(points, neighbours, grid_positions, k_nearest):
     '''
         This Function identifies the k-nearest atoms for every point within the region.
