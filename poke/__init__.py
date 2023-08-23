@@ -286,7 +286,7 @@ class Poke:
 
         # The enclosure is computed using the ratio between 
         # the number of atoms and the number of surface points
-        enclosure = np.exp(-0.2 * net_vector**2)
+        enclosure = np.exp(-0.3 * net_vector**2)
 
         # Compute three orthogonal lengths of the pocket diagonalizing the autocorrelation matrix
         residuals = surface_points - np.mean(surface_points, axis=0)
