@@ -93,7 +93,7 @@ class Poke:
         self.scoring_model = Poke.scoring_models[scoring_model]
 
     @classmethod
-    def from_mdanalysis(cls, atoms, min_volume: float=15):
+    def from_mdanalysis(cls, atoms, min_volume: float=15, scoring_model: str='model'):
         '''
         Load atoms' properties from an AtomGroup of MDAnalysis.
         Retrieve the names of the residues and atoms, and internally 
@@ -110,11 +110,11 @@ class Poke:
             resnames.append(r.resname)
             atom_names.append(r.atoms.names)
         
-        return cls.from_names(resnames, atom_names, min_volume=min_volume)
+        return cls.from_names(resnames, atom_names, min_volume=min_volume, scoring_model=scoring_model)
        
     @classmethod
     def from_names(cls, resnames: list[str], atom_names: list[list[str]],
-                   min_volume: float=15) -> 'Poke':
+                   min_volume: float=15, scoring_model: str='model') -> 'Poke':
         '''
         Retrieves atoms' properties based on the names of residues and atoms.
         Internally it uses charmm forcefield to obtain charges, sigmas and epsilons. 
@@ -133,7 +133,7 @@ class Poke:
                         for resname, names in zip(resnames, atom_names)], axis=0).T
 
         return cls(charges=charges, sigmas=sigmas, 
-                   epsilons=epsilons, min_volume=min_volume)
+                   epsilons=epsilons, min_volume=min_volume, scoring_model=scoring_model)
 
         
     def get_pockets(self, positions: np.ndarray) -> list[Pocket]:
