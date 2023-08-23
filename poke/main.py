@@ -81,8 +81,8 @@ def main():
             atoms = u.select_atoms(args.atoms)
 
             # Initialize the scouter with the atoms 
-            scouter = Poke().load_atoms_properties_from_mdanalysis(atoms)
-            
+            scouter = Poke.from_mdanalysis(atoms)
+
             frames = []
             pockets = []
 

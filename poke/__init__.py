@@ -18,7 +18,7 @@ class Poke:
                  sigmas: np.ndarray, epsilons: np.ndarray,
                  spacing: float=0.5, cutoff: float=7.5, 
                  electro_force: float=1120, probe_sigma: float=3.8,
-                 energy_threshold: float=-14.5, min_volume: float=30, 
+                 energy_threshold: float=-14.5, min_volume: float=15, 
                  min_spot_volume: float=2.7, max_bulk_distance: float=1.8, 
                  max_spot_distance: float=3.6, scoring_model: str='model'):
         '''
@@ -93,7 +93,7 @@ class Poke:
         self.scoring_model = Poke.scoring_models[scoring_model]
 
     @classmethod
-    def from_mdanalysis(cls, atoms, min_volume: float=30):
+    def from_mdanalysis(cls, atoms, min_volume: float=15):
         '''
         Load atoms' properties from an AtomGroup of MDAnalysis.
         Retrieve the names of the residues and atoms, and internally 
@@ -114,7 +114,7 @@ class Poke:
        
     @classmethod
     def from_names(cls, resnames: list[str], atom_names: list[list[str]],
-                   min_volume: float=30) -> 'Poke':
+                   min_volume: float=15) -> 'Poke':
         '''
         Retrieves atoms' properties based on the names of residues and atoms.
         Internally it uses charmm forcefield to obtain charges, sigmas and epsilons. 
