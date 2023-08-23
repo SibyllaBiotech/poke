@@ -1,6 +1,7 @@
 import json
 import numpy as np
 
+from functools import cache
 from pathlib import Path
 
 charmm = Path(__file__).absolute().parent / 'charmm36m'
@@ -12,10 +13,8 @@ class AtomsParametrizer:
     }
 
     def __init__(self, ff: Path) -> None:
-        self.residues = json.loads((ff / 'residues.json').read_bytes())
-        self.resnames = json.loads((ff / 'resnames.json').read_bytes())
-        self.atoms_types = np.loadtxt(ff / 'atoms.csv', dtype=np.float32, delimiter=',')
-    
+        self.residues, self.resnames, self.atoms_types = cached_loader(ff)
+
     def __call__(self, resname, atom_names):
         '''
         Compute parameters for a single residue. 
@@ -84,3 +83,10 @@ class AtomsParametrizer:
                                 '\nUnmatching forcefield atoms: ' + ", ".join(sorted(ff_atoms - input_atoms)))
                                     
             raise ValueError(error_msg)
+        
+@cache
+def cached_loader(ff: Path):
+    residues = json.loads((ff / 'residues.json').read_bytes())
+    resnames = json.loads((ff / 'resnames.json').read_bytes())
+    atoms_types = np.loadtxt(ff / 'atoms.csv', dtype=np.float32, delimiter=',')
+    return residues, resnames, atoms_types
