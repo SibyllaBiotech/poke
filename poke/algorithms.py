@@ -510,3 +510,153 @@ def get_region_atoms(points, neighbours, grid_positions, k_nearest):
                 
 
     return np.array(sorted(atoms)), np.linalg.norm(net_vector / net_count)
+
+
+@nb.njit(cache=True, fastmath=True, nogil=True) 
+def get_pockets(positions: np.ndarray, inverse_spacing: float, grid_cutoff: float, energy_threshold: float,
+                probe_sigmas2: np.ndarray, probe_epsilons: np.ndarray, sigma_charges: np.ndarray,
+                min_spot_points: int, max_spot_distance: float, max_bulk_distance: float, min_points: int):
+    
+    box = compute_box(positions)
+
+    # Define the origin and the shape of the grid
+    origin = box[0]
+    shape = ((box[1] - box[0]) * inverse_spacing + 0.5).astype(np.int32) + 1
+    shape_low = shape // 4 + 2
+
+    # Convert the positions of the atoms in grid indexes (floating point)
+    grid_positions = (positions - origin) * inverse_spacing
+
+    # Allocate arrays on the low-resolution grid
+    neighbours = np.zeros((shape_low[0], shape_low[1], shape_low[2], 512), dtype=np.int32)
+
+    # Allocate the map for the bulk energy
+    energy_map = np.full((shape[0], shape[1], shape[2], 2), 100, dtype=np.float32)
+
+    # Compute the bulk energy on the low-resolution grid
+    compute_low_resolution_grid(energy_map, grid_cutoff, neighbours,
+                    grid_positions, probe_sigmas2, 
+                    probe_epsilons, sigma_charges)
+    
+    _, pockets_points, pockets_slicer, surfaces_points, surfaces_slicer = enhance_volumes(
+            energy_map, energy_threshold, 
+            neighbours, grid_positions,
+            probe_sigmas2, probe_epsilons, sigma_charges)
+
+    # Convert the regions into objects
+    regions = [
+        (
+            pockets_points[pockets_slicer[i]:pockets_slicer[i+1]],
+            surfaces_points[surfaces_slicer[i]:surfaces_slicer[i+1]],
+            compute_box(surfaces_points[surfaces_slicer[i]:surfaces_slicer[i+1]]),
+            i
+        )
+        for i in range(pockets_slicer.shape[0]-1)
+            if pockets_slicer[i+1]-pockets_slicer[i] >= min_spot_points
+    ]
+
+    groups = cluster_regions(regions=regions, grid_positions=grid_positions, neighbours=neighbours,
+                    probe_sigmas2=probe_sigmas2, max_bulk_distance=max_bulk_distance,
+                    max_spot_distance=max_spot_distance, min_points=min_points)
+
+    return origin, groups, energy_map, grid_positions, neighbours, grid_positions, neighbours
+
+@nb.njit(cache=True, fastmath=True, nogil=True)
+def compute_box(array: np.ndarray):
+    box = np.empty((2,3), dtype=array.dtype)
+
+    box[0] = array[0]
+    box[1] = array[1]
+
+    for i in range(1, array.shape[0]):
+        box[0,0] = min(box[0,0], array[i,0])
+        box[1,0] = max(box[1,0], array[i,0])
+
+        box[0,1] = min(box[0,1], array[i,1])
+        box[1,1] = max(box[1,1], array[i,1])
+
+        box[0,2] = min(box[0,2], array[i,2])
+        box[1,2] = max(box[1,2], array[i,2])
+
+    return box
+
+@nb.njit(cache=True, fastmath=True, nogil=True)
+def cluster_regions(regions: list[tuple], grid_positions: np.ndarray, neighbours: np.ndarray,
+                    probe_sigmas2: np.ndarray, max_bulk_distance: float, max_spot_distance: float,
+                    min_points: int) -> tuple[np.ndarray, np.ndarray]:
+    '''
+        Divide the regions into big sections (bodies) and small sections (spots). 
+        The spots that are in close proximity to a body will be included within it.
+        For each (body + near spots) a Pocket object will be returned.
+    '''
+
+    groups = [[regions[0]]]
+
+    # Agglomerative clustering with max_bulk_distance
+    for region in regions[1:]:
+
+        # Regions that are reachable from this region
+        # and the groups not reachable
+        reachable_regions = [region]
+        unreachable_groups = []
+
+        # For each group:
+        #   if reachable 
+        #       all its regions go to reachable_regions
+        #   else if not reachable 
+        #       go in unreachable_groups
+        for group in groups:
+            reachable = False
+            for group_region in group:
+                if intersect_box(region[2], group_region[2], max_bulk_distance):
+                   if is_reachable(region[1], group_region[1], max_bulk_distance, grid_positions, probe_sigmas2, neighbours): 
+                        reachable = True 
+                        break
+            
+                if reachable:
+                    reachable_regions.extend(group)
+                else:
+                    unreachable_groups.append(group)
+
+        # The new list of groups is the unreachable_groups with appended the merged reachable_regions
+        groups = unreachable_groups
+        groups.append(reachable_regions)
+
+    # For each region:
+    #   for each group:
+    #       if the region is not present in the group
+    #           if the region reach the group with max_spot_distance
+    #               add the region to the group 
+    for region in regions:
+        for group in groups:
+            
+            # Stupid numba way to check if region in group
+            is_in_group = False
+            for group_region in group:
+                if region[3] == group_region[3]:
+                    is_in_group = True
+                    break
+
+            if not is_in_group:
+                for group_region in group:
+                    if intersect_box(region[2], group_region[2], max_spot_distance):
+                        if is_reachable(region[1], group_region[1], max_spot_distance, grid_positions, probe_sigmas2, neighbours): 
+                            group.append(region) 
+                            break
+
+    # Stupid numba way to do big_groups = [group.n_points > min_points for group in groups]                     
+    big_groups = []
+
+    for group in groups:
+        n_points = 0
+
+        for region in group:
+            n_points += region[0].shape[0]
+
+        if n_points >= min_points:
+            big_groups.append(group)
+
+    return big_groups
+
+
+
