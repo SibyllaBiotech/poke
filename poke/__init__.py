@@ -2,19 +2,21 @@
 
 __version__ = "0.0.1"
 
-import os
 import pickle
 import numpy as np
 
 from pathlib import Path
 from .pocket import Pocket
+from .parametrizer import AtomsParametrizer, charmm
 from .algorithms import compute_low_resolution_grid, enhance_volumes, \
                         intersect_box, is_reachable, get_region_atoms
 
 class Poke:
     scoring_models = {}
 
-    def __init__(self, spacing: float=0.5, cutoff: float=7.5, 
+    def __init__(self, charges: np.ndarray, 
+                 sigmas: np.ndarray, epsilons: np.ndarray,
+                 spacing: float=0.5, cutoff: float=7.5, 
                  electro_force: float=1120, probe_sigma: float=3.8,
                  energy_threshold: float=-14.5, min_volume: float=30, 
                  min_spot_volume: float=2.7, max_bulk_distance: float=1.8, 
@@ -27,6 +29,12 @@ class Poke:
 
         Parameters
         ------------
+            charges: np.ndarray
+                Array with the charges of the atoms.
+            sigmas: np.ndarray
+                Array with the Van der Waals radius of the atoms.
+            epsilons: np.ndarray
+                Array with the strength of the Van der Waals interactions.
             spacing: float
                 Distance between points in the grid.
                 A shorter distance corresponds to higher precision, 
@@ -70,45 +78,6 @@ class Poke:
         self.max_bulk_distance = max_bulk_distance * self.inverse_spacing
         self.max_spot_distance = max_spot_distance * self.inverse_spacing
 
-        self.charges: np.ndarray = None
-        self.sigmas: np.ndarray = None
-        self.epsilons: np.ndarray = None
-
-        self.probe_sigmas2: np.ndarray = None
-        self.probe_epsilons: np.ndarray = None
-        self.sigma_charges: np.ndarray = None
-
-        self.origin: np.ndarray = None
-        self.shape = (0,0,0)
-        self.shape_low = (0,0,0)
-
-        self.grid_positions: np.ndarray = None
-        self.neighbours: np.ndarray = None
-        self.energy_map: np.ndarray = None
-
-        self.parametrizer = None
-
-        if scoring_model not in Poke.scoring_models:
-            Poke.scoring_models[scoring_model] = pickle.loads((Path(__file__).parent / f'{scoring_model}.pickle').read_bytes())
-        self.scoring_model = Poke.scoring_models[scoring_model]
-
-    def load_atoms_properties(self, charges: np.ndarray, sigmas: np.ndarray, epsilons: np.ndarray) -> 'Poke':
-        '''
-        Load the atoms' parameters into the scouter.
-        This function must be called before the scouting.
-        Once the properties are loaded, the scouter can process multiple
-        frames containing the same atoms but positioned differently.            
-        The parameters should be taken from charmm forcefield.
-
-        Parameters
-        ------------
-            charges: np.ndarray
-                Array with the charges of the atoms.
-            sigmas: np.ndarray
-                Array with the Van der Waals radius of the atoms.
-            epsilons: np.ndarray
-                Array with the strength of the Van der Waals interactions.
-        '''
         self.charges = charges
         self.sigmas = sigmas
         self.epsilons = epsilons
@@ -118,9 +87,13 @@ class Poke:
         self.probe_sigmas2 = (combined_sigmas * self.inverse_spacing)**2 
         self.probe_epsilons = 6.26 * np.sqrt(epsilons)
         self.sigma_charges = self.electro_force * self.charges / combined_sigmas**6
-        return self
 
-    def load_atoms_properties_from_mdanalysis(self, atoms):
+        if scoring_model not in Poke.scoring_models:
+            Poke.scoring_models[scoring_model] = pickle.loads((Path(__file__).parent / f'{scoring_model}.pickle').read_bytes())
+        self.scoring_model = Poke.scoring_models[scoring_model]
+
+    @classmethod
+    def from_mdanalysis(cls, atoms, min_volume: float=30):
         '''
         Load atoms' properties from an AtomGroup of MDAnalysis.
         Retrieve the names of the residues and atoms, and internally 
@@ -137,10 +110,11 @@ class Poke:
             resnames.append(r.resname)
             atom_names.append(r.atoms.names)
         
-        return self.load_atoms_properties_from_names(resnames, atom_names)
+        return cls.from_names(resnames, atom_names, min_volume=min_volume)
        
-
-    def load_atoms_properties_from_names(self, resnames: list[str], atom_names: list[list[str]]) -> 'Poke':
+    @classmethod
+    def from_names(cls, resnames: list[str], atom_names: list[list[str]],
+                   min_volume: float=30) -> 'Poke':
         '''
         Retrieves atoms' properties based on the names of residues and atoms.
         Internally it uses charmm forcefield to obtain charges, sigmas and epsilons. 
@@ -153,16 +127,13 @@ class Poke:
                 List containing the names of atoms for each residue.
                 atom_names and resnames must have the same length. 
         '''
-        if self.parametrizer is None:
-            from .parametrizer import AtomsParametrizer, charmm
-            self.parametrizer = AtomsParametrizer(charmm)
+        parametrizer = AtomsParametrizer(charmm)
 
-        charges, sigmas, epsilons = np.concatenate([self.parametrizer(resname, names) 
+        charges, sigmas, epsilons = np.concatenate([parametrizer(resname, names) 
                         for resname, names in zip(resnames, atom_names)], axis=0).T
 
-        return self.load_atoms_properties(charges=charges, 
-                                          sigmas=sigmas, 
-                                          epsilons=epsilons)
+        return cls(charges=charges, sigmas=sigmas, 
+                   epsilons=epsilons, min_volume=min_volume)
 
         
     def get_pockets(self, positions: np.ndarray) -> list[Pocket]:
@@ -186,32 +157,32 @@ class Poke:
         pos_max = np.max(positions, axis=0)
 
         # Define the origin and the shape of the grid
-        self.origin = pos_min
-        self.shape = np.round((pos_max - pos_min) * self.inverse_spacing).astype(np.int32) + 1
-        self.shape_low = self.shape // 4 + 2
+        origin = pos_min
+        shape = np.round((pos_max - pos_min) * self.inverse_spacing).astype(np.int32) + 1
+        shape_low = shape // 4 + 2
 
         # Check the size of the box
-        if any(l > 1000000 for l in self.shape):
+        if any(l > 1000000 for l in shape):
             raise RuntimeError('The box surrounding the system is too big.')
 
         # Convert the positions of the atoms in grid indexes (floating point)
-        self.grid_positions = (positions - self.origin) * self.inverse_spacing
+        grid_positions = (positions - origin) * self.inverse_spacing
 
         # Allocate arrays on the low-resolution grid
-        self.neighbours = np.zeros((*self.shape_low, 512), dtype=np.int32)
+        neighbours = np.zeros((*shape_low, 512), dtype=np.int32)
 
         # Allocate the map for the bulk energy
-        self.energy_map = np.full((*self.shape, 2), 100, dtype=np.float32)
+        energy_map = np.full((*shape, 2), 100, dtype=np.float32)
 
         # Compute the bulk energy on the low-resolution grid
-        compute_low_resolution_grid(self.energy_map, self.grid_cutoff, self.neighbours,
-                     self.grid_positions, self.probe_sigmas2, 
+        compute_low_resolution_grid(energy_map, self.grid_cutoff, neighbours,
+                     grid_positions, self.probe_sigmas2, 
                      self.probe_epsilons, self.sigma_charges)
 
         # Increase the resolution of the low-energy regions 
         _, pockets_points, pockets_slicer, surfaces_points, surfaces_slicer = enhance_volumes(
-            self.energy_map, self.energy_threshold, 
-            self.neighbours, self.grid_positions,
+            energy_map, self.energy_threshold, 
+            neighbours, grid_positions,
             self.probe_sigmas2, self.probe_epsilons, self.sigma_charges)
 
         # Convert the regions into objects
@@ -221,12 +192,16 @@ class Poke:
                         if pockets_slicer[i+1]-pockets_slicer[i] >= self.min_spot_points]
 
         # Cluster the spots with the big regions
-        pockets = self.cluster_regions(regions)
+        return [
+            self.compute_descriptors(volume_points=volume_points, surface_points=surface_points,
+                                     origin=origin, energy_map=energy_map, 
+                                     grid_positions=grid_positions, neighbours=neighbours)
+            for volume_points, surface_points in self.cluster_regions(regions, grid_positions, neighbours)
+        ]
 
-        # Create a grid with atoms' types
-        return pockets
-
-    def cluster_regions(self, regions: list['Region']) -> list['Pocket']:
+    def cluster_regions(self, regions: list['Region'], 
+                        grid_positions: np.ndarray,
+                        neighbours: np.ndarray) -> list['Pocket']:
         '''
             Divide the regions into big sections (bodies) and small sections (spots). 
             The spots that are in close proximity to a body will be included within it.
@@ -251,15 +226,13 @@ class Poke:
                 for r2 in list(regions1):
                     if intersect_box(r1.box, r2.box, self.max_bulk_distance):
                         if is_reachable(r1.surface_points, r2.surface_points, self.max_bulk_distance, 
-                                    self.grid_positions, self.probe_sigmas2, self.neighbours):
+                                    grid_positions, self.probe_sigmas2, neighbours):
                             regions1.remove(r2)
                             group.append(r2)
                             stack.add(r2)
 
             grouped_regions.append(group)
 
-        # Add small regions around the big ones and build the pockets
-        pockets = []
         for br_group in grouped_regions:
             volume_points = []
             surface_points = []
@@ -273,7 +246,7 @@ class Poke:
                 for sr in list(regions2_tmp):
                     if intersect_box(br.box, sr.box, self.max_spot_distance):
                          if is_reachable(br.surface_points, sr.surface_points, self.max_spot_distance, 
-                                         self.grid_positions, self.probe_sigmas2, self.neighbours):
+                                         grid_positions, self.probe_sigmas2, neighbours):
                             volume_points.append(sr.volume_points)
                             surface_points.append(sr.surface_points)
                             regions2_tmp.remove(sr)
@@ -281,11 +254,14 @@ class Poke:
             volume_points = np.concatenate(volume_points)
             if volume_points.shape[0] >= self.min_points:
                 surface_points = np.concatenate(surface_points)
-                pockets.append(self.compute_descriptors(volume_points, surface_points))
+                yield volume_points, surface_points
 
-        return pockets
-
-    def compute_descriptors(self, volume_points: np.ndarray, surface_points: np.ndarray) -> Pocket:
+    def compute_descriptors(self, volume_points: np.ndarray, 
+                                  surface_points: np.ndarray,
+                                  origin: tuple[float, float, float],
+                                  energy_map: np.ndarray,
+                                  grid_positions: np.ndarray,
+                                  neighbours: np.ndarray) -> Pocket:
         '''
             Compute descriptors of a region to build a Pocket.
             Most properties are computed using the surface_points
@@ -306,7 +282,7 @@ class Poke:
         # surface_points = np.concatenate(surface_points)
 
         # Compute the list of the atoms surrounding the pocket
-        atoms, net_vector = get_region_atoms(surface_points, self.neighbours, self.grid_positions, k_nearest=int(20 * self.spacing**2 + 0.5))
+        atoms, net_vector = get_region_atoms(surface_points, neighbours, grid_positions, k_nearest=int(20 * self.spacing**2 + 0.5))
 
         # The enclosure is computed using the ratio between 
         # the number of atoms and the number of surface points
@@ -318,8 +294,8 @@ class Poke:
         lengths = np.sqrt(variances)[::-1] * self.spacing
 
         # Extract the electrostatic potential
-        energy = self.energy_map[volume_points[:,0], volume_points[:,1], volume_points[:,2], 0] 
-        electro = self.energy_map[volume_points[:,0], volume_points[:,1], volume_points[:,2], 1]
+        energy = energy_map[volume_points[:,0], volume_points[:,1], volume_points[:,2], 0] 
+        electro = energy_map[volume_points[:,0], volume_points[:,1], volume_points[:,2], 1]
 
         # Count polar and apolar atoms
         charges = self.charges[atoms]
@@ -328,21 +304,13 @@ class Poke:
         spacing_matrix = np.diag(np.full(3, self.spacing, dtype=np.float32))
 
         # Create a pocket with the computed properties
-        pocket = Pocket(self.origin, spacing_matrix, volume_points=volume_points, 
+        pocket = Pocket(origin, spacing_matrix, volume_points=volume_points, 
                       surface_points=surface_points, energy=energy, electro=electro, 
                       atoms=atoms, charges=charges, lengths=lengths, enclosure=enclosure)
 
         # Compute the score
         pocket.score = self.scoring_model(np.array(pocket.features()))[0]
         return pocket
-
-
-    def write_bulk_map(self, out: os.PathLike):
-        from gridData import Grid
-        Grid(grid=np.clip(self.bulk_map.astype(np.float16), -25, 3), 
-             origin=self.origin, 
-             delta=[self.spacing]*3).export(out, file_format='dx')
-
 
 class Region:
     def __init__(self, volume_points: np.ndarray, surface_points: np.ndarray):
