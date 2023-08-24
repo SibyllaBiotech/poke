@@ -152,52 +152,52 @@ class Poke:
             pockets: list[Pocket]
                 the list of pockets
         '''
-        # # Compute the origin and the shape of the map
-        # pos_min = np.min(positions, axis=0)
-        # pos_max = np.max(positions, axis=0)
+        # Compute the origin and the shape of the map
+        pos_min = np.min(positions, axis=0)
+        pos_max = np.max(positions, axis=0)
 
-        # # Define the origin and the shape of the grid
-        # origin = pos_min
-        # shape = np.round((pos_max - pos_min) * self.inverse_spacing).astype(np.int32) + 1
-        # shape_low = shape // 4 + 2
+        # Define the origin and the shape of the grid
+        origin = pos_min
+        shape = np.round((pos_max - pos_min) * self.inverse_spacing).astype(np.int32) + 1
+        shape_low = shape // 4 + 2
 
-        # # Check the size of the box
-        # if any(l > 1000000 for l in shape):
-        #     raise RuntimeError('The box surrounding the system is too big.')
+        # Check the size of the box
+        if any(l > 1000000 for l in shape):
+            raise RuntimeError('The box surrounding the system is too big.')
 
-        # # Convert the positions of the atoms in grid indexes (floating point)
-        # grid_positions = (positions - origin) * self.inverse_spacing
+        # Convert the positions of the atoms in grid indexes (floating point)
+        grid_positions = (positions - origin) * self.inverse_spacing
 
-        # # Allocate arrays on the low-resolution grid
-        # neighbours = np.zeros((*shape_low, 512), dtype=np.int32)
+        # Allocate arrays on the low-resolution grid
+        neighbours = np.zeros((*shape_low, 512), dtype=np.int32)
 
-        # # Allocate the map for the bulk energy
-        # energy_map = np.full((*shape, 2), 100, dtype=np.float32)
+        # Allocate the map for the bulk energy
+        energy_map = np.full((*shape, 2), 100, dtype=np.float32)
 
-        # # Compute the bulk energy on the low-resolution grid
-        # compute_low_resolution_grid(energy_map, self.grid_cutoff, neighbours,
-        #              grid_positions, self.probe_sigmas2, 
-        #              self.probe_epsilons, self.sigma_charges)
+        # Compute the bulk energy on the low-resolution grid
+        compute_low_resolution_grid(energy_map, self.grid_cutoff, neighbours,
+                     grid_positions, self.probe_sigmas2, 
+                     self.probe_epsilons, self.sigma_charges)
 
-        # # Increase the resolution of the low-energy regions 
-        # _, pockets_points, pockets_slicer, surfaces_points, surfaces_slicer = enhance_volumes(
-        #     energy_map, self.energy_threshold, 
-        #     neighbours, grid_positions,
-        #     self.probe_sigmas2, self.probe_epsilons, self.sigma_charges)
+        # Increase the resolution of the low-energy regions 
+        _, pockets_points, pockets_slicer, surfaces_points, surfaces_slicer = enhance_volumes(
+            energy_map, self.energy_threshold, 
+            neighbours, grid_positions,
+            self.probe_sigmas2, self.probe_epsilons, self.sigma_charges)
 
-        # # Convert the regions into objects
-        # regions = [Region(pockets_points[pockets_slicer[i]:pockets_slicer[i+1]],
-        #                   surfaces_points[surfaces_slicer[i]:surfaces_slicer[i+1]]) 
-        #             for i in range(pockets_slicer.shape[0]-1)
-        #                 if pockets_slicer[i+1]-pockets_slicer[i] >= self.min_spot_points]
+        # Convert the regions into objects
+        regions = [Region(pockets_points[pockets_slicer[i]:pockets_slicer[i+1]],
+                          surfaces_points[surfaces_slicer[i]:surfaces_slicer[i+1]]) 
+                    for i in range(pockets_slicer.shape[0]-1)
+                        if pockets_slicer[i+1]-pockets_slicer[i] >= self.min_spot_points]
 
-        # # Cluster the spots with the big regions
-        # return [
-        #     self.compute_descriptors(volume_points=volume_points, surface_points=surface_points,
-        #                              origin=origin, energy_map=energy_map, 
-        #                              grid_positions=grid_positions, neighbours=neighbours)
-        #     for volume_points, surface_points in self.cluster_regions(regions, grid_positions, neighbours)
-        # ]
+        # Cluster the spots with the big regions
+        pockets1 =  [
+            self.compute_descriptors(volume_points=volume_points, surface_points=surface_points,
+                                     origin=origin, energy_map=energy_map, 
+                                     grid_positions=grid_positions, neighbours=neighbours)
+            for volume_points, surface_points in self.cluster_regions(regions, grid_positions, neighbours)
+        ]
 
         origin, groups, energy_map, grid_positions, neighbours, grid_positions, neighbours = get_pockets(positions=positions, inverse_spacing=self.inverse_spacing,
                         grid_cutoff=self.grid_cutoff, energy_threshold=self.energy_threshold,
@@ -207,13 +207,25 @@ class Poke:
                         min_points=self.min_points)
 
         # Cluster the spots with the big regions
-        return [
+        pockets2 = [
             self.compute_descriptors(volume_points=np.concatenate([r[0] for r in regions]), 
                                      surface_points=np.concatenate([r[1] for r in regions]),
                                      origin=origin, energy_map=energy_map, 
                                      grid_positions=grid_positions, neighbours=neighbours)
             for regions in groups
         ]
+
+        if len(pockets1) != len(pockets2):
+            pockets1 = sorted(pockets1, key=lambda p: p.volume)
+            pockets2 = sorted(pockets2, key=lambda p: p.volume)
+
+            print(len(pockets1), len(pockets2))
+
+            print([p.volume for p in pockets1])
+            print([p.volume for p in pockets2])
+
+
+        return pockets1
 
     def cluster_regions(self, regions: list['Region'], 
                         grid_positions: np.ndarray,

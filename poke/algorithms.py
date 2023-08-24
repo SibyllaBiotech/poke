@@ -589,7 +589,6 @@ def cluster_regions(regions: list[tuple], grid_positions: np.ndarray, neighbours
         The spots that are in close proximity to a body will be included within it.
         For each (body + near spots) a Pocket object will be returned.
     '''
-
     groups = [[regions[0]]]
 
     # Agglomerative clustering with max_bulk_distance
@@ -607,16 +606,18 @@ def cluster_regions(regions: list[tuple], grid_positions: np.ndarray, neighbours
         #       go in unreachable_groups
         for group in groups:
             reachable = False
+
+            # Check if group is reachable comparing all the regions of the group
             for group_region in group:
                 if intersect_box(region[2], group_region[2], max_bulk_distance):
                    if is_reachable(region[1], group_region[1], max_bulk_distance, grid_positions, probe_sigmas2, neighbours): 
                         reachable = True 
                         break
             
-                if reachable:
-                    reachable_regions.extend(group)
-                else:
-                    unreachable_groups.append(group)
+            if reachable:
+                reachable_regions.extend(group)
+            else:
+                unreachable_groups.append(group)
 
         # The new list of groups is the unreachable_groups with appended the merged reachable_regions
         groups = unreachable_groups
@@ -631,20 +632,20 @@ def cluster_regions(regions: list[tuple], grid_positions: np.ndarray, neighbours
         for group in groups:
             
             # Stupid numba way to check if region in group
-            is_in_group = False
+            region_in_group = False
             for group_region in group:
                 if region[3] == group_region[3]:
-                    is_in_group = True
+                    region_in_group = True
                     break
 
-            if not is_in_group:
+            if not region_in_group:
                 for group_region in group:
                     if intersect_box(region[2], group_region[2], max_spot_distance):
                         if is_reachable(region[1], group_region[1], max_spot_distance, grid_positions, probe_sigmas2, neighbours): 
                             group.append(region) 
                             break
 
-    # Stupid numba way to do big_groups = [group.n_points > min_points for group in groups]                     
+    # Stupid numba way to do big_groups = [group.n_points >= min_points for group in groups]                     
     big_groups = []
 
     for group in groups:
@@ -655,6 +656,13 @@ def cluster_regions(regions: list[tuple], grid_positions: np.ndarray, neighbours
 
         if n_points >= min_points:
             big_groups.append(group)
+
+
+    unique_groups = []
+
+    # for group in groups:
+    #     jk
+    
 
     return big_groups
 
