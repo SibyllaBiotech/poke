@@ -304,7 +304,7 @@ class Poke:
         spacing_matrix = np.diag(np.full(3, self.spacing, dtype=np.float32))
 
         # Create a pocket with the computed properties
-        pocket = Pocket(origin, spacing_matrix, volume_points=volume_points, 
+        pocket = Pocket(origin.copy(), spacing_matrix, volume_points=volume_points, 
                       surface_points=surface_points, energy=energy, electro=electro, 
                       atoms=atoms, charges=charges, lengths=lengths, enclosure=enclosure)
 
