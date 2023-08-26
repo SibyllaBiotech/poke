@@ -4,6 +4,7 @@ import gzip
 import argparse
 import warnings
 import pickle
+import numpy as np
 from pathlib import Path
 from multiprocessing import Pool
 
@@ -12,6 +13,7 @@ from poke.filter import PocketEvaluator
 from poke.writer import PocketWriter
 
 from MDAnalysis import Universe, AtomGroup, Writer
+from MDAnalysis.analysis.align import rotation_matrix
 from rich import progress
 from rich.text import Text
 
@@ -36,13 +38,15 @@ def main():
                         'compute the descriptors and save them in a csv file.')
     parser.add_argument('-v', '--volumes', action='store_true', default=False, help=
                         'save the volumes and save them in a multi-model PDB file.')
-    parser.add_argument('-a', '--atoms', type=str, metavar='', default='all', help=
+    parser.add_argument('-sel', '--selection', type=str, metavar='', default='all', help=
                         'selection of atoms used by the scouter.')
     parser.add_argument('-e', '--extract', action='store_true', default=False, help=
                         'save the results relative to a new trajectory containing only frames with at least one pocket.')
+    parser.add_argument('-a', '--align', type=str, metavar='', default=None, help=
+                        'align the given atoms selection to the reference')
     parser.add_argument('-s', '--sort', type=str, metavar='', default=None, help=
                         'sorting by the value of an expression.')
-    parser.add_argument('-n', '--max-pockets', type=int, metavar='', default=None, help=
+    parser.add_argument('-n', '--max-output-frames', type=int, metavar='', default=None, help=
                         'maximum number of pocket in the output. Only when --sort is used.')
     parser.add_argument('-p', '--pymol', action='store_true', default=False, help=
                         'save a pymol script usable to open the pockets found.')
@@ -78,7 +82,7 @@ def main():
 
             # Suppress the warning during the opening of the structures
             u = Universe(*structures)
-            atoms = u.select_atoms(args.atoms)
+            atoms = u.select_atoms(args.selection)
 
             # Initialize the scouter with the atoms 
             scouter = Poke.from_mdanalysis(atoms)
@@ -111,7 +115,7 @@ def main():
 
                 # Set chunksize accordingly 
                 # for low number of cores, chunksize is smaller to update progress bar more frequently
-                chunksize = max(12, min(u.trajectory.n_frames // args.ncores, args.ncores*8))
+                chunksize = max(12, min(u.trajectory.n_frames // args.ncores, args.ncores*4))
 
                 with Pool(processes=args.ncores) as pool: 
                     iter_frames_pockets = pool.imap(scouter.get_pockets, (atoms.positions for _ in u.trajectory), chunksize=chunksize)
@@ -144,29 +148,19 @@ def main():
             if args.sort and frames and pockets:
                 frames, pockets = zip(*sorted(zip(frames, pockets), key=lambda fp: PocketEvaluator.evaluate(args.sort, fp[1][0], atoms), reverse=True))
 
-                if args.max_pockets is not None:
-                    frames = frames[:args.max_pockets]
-                    pockets = pockets[:args.max_pockets]
-
+            if args.max_output_frames is not None:
+                frames = frames[:args.max_output_frames]
+                pockets = pockets[:args.max_output_frames]
 
             # Create the output directory
             out_dir.mkdir(parents=True, exist_ok=True)
 
-            # If args.extract is set, write a new trajectory with all
-            # the frames collected in the list (with at least a pocket)
-            if args.extract or args.sort:
-                write_coordinates(out_dir, atoms, frames)
+            # Write atoms anv volumes
+            if args.extract or args.sort or args.volumes:
+                write_atoms_and_pockets(args, structures, out_dir, atoms, frames, pockets)
 
             if args.descriptors:
                 write_desciptors(out_dir, atoms, pockets, frames)
-
-            if args.volumes:                
-                if args.extract or args.sort:
-                    # If the args.extract flag is active the pymol script needs a 
-                    # trajectory with only the frames written by write_coordinates
-                    write_points(args, out_dir, [out_dir / 'structure.pdb', out_dir / 'frames.xtc'], pockets)
-                else:
-                    write_points(args, out_dir, structures, pockets)
 
             if args.pickle:
                 write_pickle(args, out_dir, pockets)
@@ -204,18 +198,60 @@ def split_structures(structures: list[Path]):
     if output_list:
         yield output_list
 
-def write_coordinates(out_dir, atoms: AtomGroup, frames: list[int]):
-    '''
-        Write an xtc trajectory with a subset of 
-        the frames specified in the list frames.
-    '''
-    atoms.universe.trajectory[0]
-    atoms.write(str(out_dir / 'structure.pdb'))
+def write_atoms_and_pockets(args, structures: list[Path], out_dir: Path, atoms: AtomGroup, frames: list[int], pockets: list[list[Pocket]]):
+    
+    if args.align is not None:
+        reference = Universe(structures[0])
+        aligner = Aligner(reference.select_atoms(args.align))
 
-    with Writer(str(out_dir / 'frames.xtc'), multiframe=True) as stream:
-        for frame in frames:
-            atoms.universe.trajectory[frame]
-            stream.write(atoms)
+    try:
+        atoms_writer = None
+        pockets_writer = None
+
+        if args.extract or args.sort:
+            atoms_writer = Writer(str(out_dir / 'frames.xtc'), multiframe=True)
+            ts = atoms.universe.trajectory[0]
+
+            if args.align:
+                atoms.positions = aligner.compute(ts.positions).apply(atoms.positions)
+
+            atoms.write(str(out_dir / 'structure.pdb'))
+        
+        if args.volumes:
+            pockets_writer = PocketWriter(open_stream(out_dir / 'volumes.pdb', 'wt', args.compress), resid_start=resid_start)
+            
+        for frame, pks in zip(frames, pockets):
+            ts = atoms.universe.trajectory[frame]
+
+            if args.align:
+                aligner.compute(ts.positions)
+                
+            if atoms_writer:
+                atoms.positions = aligner.apply(atoms.positions)
+                atoms_writer.write(atoms)
+
+            if pockets_writer:
+                if args.align:
+                    for p in pks:
+                        p.translate(-aligner.positions_cog)
+                        p.apply_matrix(aligner.rotation)
+                        p.translate(aligner.reference_cog)
+
+                pockets_writer.write_frame(pks)
+
+        if args.pymol:
+            if args.extract or args.sort:
+                structures_script = [out_dir / 'structure.pdb', out_dir / 'frames.xtc']
+            else:
+                structures_script = structures
+
+            pockets_writer.write_pymol_script(out_dir / 'pymol.pml', structures_script)
+
+    finally:
+        if atoms_writer:
+            atoms_writer.close()
+        if pockets_writer:
+            pockets_writer.output.close()
 
 def write_desciptors(out_dir, atoms: AtomGroup, pockets: list[Pocket], frames: list[int]):
     '''
@@ -250,15 +286,6 @@ def write_desciptors(out_dir, atoms: AtomGroup, pockets: list[Pocket], frames: l
                     ' '.join(map(str, p.atoms))
                 ))
 
-
-def write_points(args, out_dir, structures: list[Path],  pockets: list[list[Pocket]]):
-    with PocketWriter(open_stream(out_dir / 'volumes.pdb', 'wt', args.compress), resid_start=resid_start) as writer:
-        for pks in pockets:
-            writer.write_frame(pks)
-
-        if args.pymol:
-            writer.write_pymol_script(out_dir / 'pymol.pml', structures)#, {'ligand': Path('1gkc/ligand.pdb')})
-
 def write_pickle(args, out_dir, pockets: list[list[Pocket]]):
     with open_stream(out_dir / 'pockets.pickle', 'wb', args.compress) as stream:
         pickle.dump(pockets, stream)
@@ -287,7 +314,26 @@ class PocketsFoundColumn(progress.ProgressColumn):
             text += Text(f" {n_filtered} discarted", style="cyan")
         return text
 
+class Aligner:
 
+    def __init__(self, align_group: AtomGroup) -> None:
+        self.indexes   = align_group.ix
+        self.reference = align_group.positions
+
+        self.reference_cog = np.mean(self.reference, axis=0)
+        self.reference -= self.reference_cog
+
+    def compute(self, positions: np.ndarray):
+        positions = positions[self.indexes]
+        self.positions_cog = np.mean(positions, axis=0)
+        self.rotation, _ = rotation_matrix(positions - self.positions_cog, self.reference)
+        return self
+        
+    def apply(self, positions: np.ndarray):
+        return np.dot(positions - self.positions_cog, self.rotation.T) + self.reference_cog
+    
+    def __call__(self, positions: np.ndarray):
+        return self.compute(positions).apply(positions)
 
 class UserError(RuntimeError):
     pass
