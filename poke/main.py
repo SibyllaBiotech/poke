@@ -115,7 +115,7 @@ def main():
 
                 # Set chunksize accordingly 
                 # for low number of cores, chunksize is smaller to update progress bar more frequently
-                chunksize = max(12, min(u.trajectory.n_frames // args.ncores, args.ncores*4))
+                chunksize = max(8, min(u.trajectory.n_frames // args.ncores, args.ncores*2))
 
                 with Pool(processes=args.ncores) as pool: 
                     iter_frames_pockets = pool.imap(scouter.get_pockets, (atoms.positions for _ in u.trajectory), chunksize=chunksize)

@@ -152,210 +152,35 @@ class Poke:
             pockets: list[Pocket]
                 the list of pockets
         '''
-        # Compute the origin and the shape of the map
-        pos_min = np.min(positions, axis=0)
-        pos_max = np.max(positions, axis=0)
-
-        # Define the origin and the shape of the grid
-        origin = pos_min
-        shape = np.round((pos_max - pos_min) * self.inverse_spacing).astype(np.int32) + 1
-        shape_low = shape // 4 + 2
-
-        # Check the size of the box
-        if any(l > 1000000 for l in shape):
-            raise RuntimeError('The box surrounding the system is too big.')
-
-        # Convert the positions of the atoms in grid indexes (floating point)
-        grid_positions = (positions - origin) * self.inverse_spacing
-
-        # Allocate arrays on the low-resolution grid
-        neighbours = np.zeros((*shape_low, 512), dtype=np.int32)
-
-        # Allocate the map for the bulk energy
-        energy_map = np.full((*shape, 2), 100, dtype=np.float32)
-
-        # Compute the bulk energy on the low-resolution grid
-        compute_low_resolution_grid(energy_map, self.grid_cutoff, neighbours,
-                     grid_positions, self.probe_sigmas2, 
-                     self.probe_epsilons, self.sigma_charges)
-
-        # Increase the resolution of the low-energy regions 
-        _, pockets_points, pockets_slicer, surfaces_points, surfaces_slicer = enhance_volumes(
-            energy_map, self.energy_threshold, 
-            neighbours, grid_positions,
-            self.probe_sigmas2, self.probe_epsilons, self.sigma_charges)
-
-        # Convert the regions into objects
-        regions = [Region(pockets_points[pockets_slicer[i]:pockets_slicer[i+1]],
-                          surfaces_points[surfaces_slicer[i]:surfaces_slicer[i+1]]) 
-                    for i in range(pockets_slicer.shape[0]-1)
-                        if pockets_slicer[i+1]-pockets_slicer[i] >= self.min_spot_points]
-
-        # Cluster the spots with the big regions
-        pockets1 =  [
-            self.compute_descriptors(volume_points=volume_points, surface_points=surface_points,
-                                     origin=origin, energy_map=energy_map, 
-                                     grid_positions=grid_positions, neighbours=neighbours)
-            for volume_points, surface_points in self.cluster_regions(regions, grid_positions, neighbours)
-        ]
-
-        origin, groups, energy_map, grid_positions, neighbours, grid_positions, neighbours = get_pockets(positions=positions, inverse_spacing=self.inverse_spacing,
+        pockets_raw = get_pockets(positions=positions, inverse_spacing=self.inverse_spacing,
                         grid_cutoff=self.grid_cutoff, energy_threshold=self.energy_threshold,
                         probe_sigmas2=self.probe_sigmas2, probe_epsilons=self.probe_epsilons,
                         sigma_charges=self.sigma_charges, min_spot_points=self.min_spot_points,
                         max_spot_distance=self.max_spot_distance, max_bulk_distance=self.max_bulk_distance, 
                         min_points=self.min_points)
 
-        # Cluster the spots with the big regions
-        pockets2 = [
-            self.compute_descriptors(volume_points=np.concatenate([r[0] for r in regions]), 
-                                     surface_points=np.concatenate([r[1] for r in regions]),
-                                     origin=origin, energy_map=energy_map, 
-                                     grid_positions=grid_positions, neighbours=neighbours)
-            for regions in groups
+        # Create the pockets objects
+        pockets = [
+            Pocket(
+                origin=origin, 
+                spacing=np.diag(np.full(3, self.spacing, dtype=np.float32)), 
+                volume_points=volume_points, 
+                surface_points=surface_points,
+                regions=regions,
+                energy=energy,
+                electro=electro,
+                atoms=atoms,
+                charges=self.charges[atoms],
+                lengths=lengths,
+                enclosure=enclosure
+            )
+            for origin, volume_points, surface_points, regions, atoms, enclosure, lengths, energy, electro in pockets_raw
         ]
 
-        if len(pockets1) != len(pockets2):
-            pockets1 = sorted(pockets1, key=lambda p: p.volume)
-            pockets2 = sorted(pockets2, key=lambda p: p.volume)
+        # Compute the score for each pocket
+        for p in pockets:
+            p.score = self.scoring_model(np.array(p.features()))[0]
 
-            print(len(pockets1), len(pockets2))
-
-            print([p.volume for p in pockets1])
-            print([p.volume for p in pockets2])
-
-
-        return pockets1
-
-    def cluster_regions(self, regions: list['Region'], 
-                        grid_positions: np.ndarray,
-                        neighbours: np.ndarray) -> list['Pocket']:
-        '''
-            Divide the regions into big sections (bodies) and small sections (spots). 
-            The spots that are in close proximity to a body will be included within it.
-            For each (body + near spots) a Pocket object will be returned.
-        '''
-        # big_regions: set[Region] = set()
-        # small_regions: set[Region] = set()
-        regions1 = set(regions)
-        regions2 = regions1.copy()
-        grouped_regions: list[list[Region]] = []
-
-        # Divide the regions in big regions (bodies) and small regions (spots)
-        # for r in regions:
-        #     (big_regions if r.volume >= self.min_body_points else small_regions).add(r)
-        
-        # Merge big regions in groups if they are close enough
-        while regions1:
-            group = [regions1.pop()]
-            stack = {group[0]}
-            while stack:
-                r1 = stack.pop()
-                for r2 in list(regions1):
-                    if intersect_box(r1.box, r2.box, self.max_bulk_distance):
-                        if is_reachable(r1.surface_points, r2.surface_points, self.max_bulk_distance, 
-                                    grid_positions, self.probe_sigmas2, neighbours):
-                            regions1.remove(r2)
-                            group.append(r2)
-                            stack.add(r2)
-
-            grouped_regions.append(group)
-
-        for br_group in grouped_regions:
-            volume_points = []
-            surface_points = []
-            regions2_tmp = regions2.copy()
-            for br in br_group:
-                regions2_tmp.remove(br)
-            
-            for br in br_group:
-                volume_points.append(br.volume_points)
-                surface_points.append(br.surface_points)
-                for sr in list(regions2_tmp):
-                    if intersect_box(br.box, sr.box, self.max_spot_distance):
-                         if is_reachable(br.surface_points, sr.surface_points, self.max_spot_distance, 
-                                         grid_positions, self.probe_sigmas2, neighbours):
-                            volume_points.append(sr.volume_points)
-                            surface_points.append(sr.surface_points)
-                            regions2_tmp.remove(sr)
-            
-            volume_points = np.concatenate(volume_points)
-            if volume_points.shape[0] >= self.min_points:
-                surface_points = np.concatenate(surface_points)
-                yield volume_points, surface_points
-
-    def compute_descriptors(self, volume_points: np.ndarray, 
-                                  surface_points: np.ndarray,
-                                  origin: tuple[float, float, float],
-                                  energy_map: np.ndarray,
-                                  grid_positions: np.ndarray,
-                                  neighbours: np.ndarray) -> Pocket:
-        '''
-            Compute descriptors of a region to build a Pocket.
-            Most properties are computed using the surface_points
-            due to their greater efficiency.
-
-            Parameters
-            ------------
-                volume_points: np.ndarray
-                    Points within the regions for region computation
-                surface_points: np.ndarray
-                    Points on the surface of the same region
-                    
-        '''
-        # n_regions = len(volume_points)
-
-        # Concatenate the list of points
-        # volume_points = np.concatenate(volume_points)
-        # surface_points = np.concatenate(surface_points)
-
-        # Compute the list of the atoms surrounding the pocket
-        atoms, net_vector = get_region_atoms(surface_points, neighbours, grid_positions, k_nearest=int(20 * self.spacing**2 + 0.5))
-
-        # The enclosure is computed using the ratio between 
-        # the number of atoms and the number of surface points
-        enclosure = np.exp(-0.3 * net_vector**2)
-
-        # Compute three orthogonal lengths of the pocket diagonalizing the autocorrelation matrix
-        residuals = surface_points - np.mean(surface_points, axis=0)
-        variances = np.linalg.eigvalsh(np.dot(residuals.T, residuals)) / residuals.shape[0]
-        lengths = np.sqrt(variances)[::-1] * self.spacing
-
-        # Extract the electrostatic potential
-        energy = energy_map[volume_points[:,0], volume_points[:,1], volume_points[:,2], 0] 
-        electro = energy_map[volume_points[:,0], volume_points[:,1], volume_points[:,2], 1]
-
-        # Count polar and apolar atoms
-        charges = self.charges[atoms]
-
-        # The pocket requires a spacing as a full-matrix 
-        spacing_matrix = np.diag(np.full(3, self.spacing, dtype=np.float32))
-
-        # Create a pocket with the computed properties
-        pocket = Pocket(origin.copy(), spacing_matrix, volume_points=volume_points, 
-                      surface_points=surface_points, energy=energy, electro=electro, 
-                      atoms=atoms, charges=charges, lengths=lengths, enclosure=enclosure)
-
-        # Compute the score
-        pocket.score = self.scoring_model(np.array(pocket.features()))[0]
-        return pocket
-
-class Region:
-    def __init__(self, volume_points: np.ndarray, surface_points: np.ndarray):
-        self.volume_points = volume_points
-        self.surface_points = surface_points
-
-        # Total volume of the region
-        self.surface = self.surface_points.shape[0]
-        self.volume = self.volume_points.shape[0]
-        
-        # Box containing all the points
-        self.box = np.array([np.min(surface_points, axis=0), np.max(surface_points, axis=0)])
-
-    def ix(self):
-        ''' Useful to extract values from a map using map[region.ix()] '''
-        return self.volume_points[:,0], self.volume_points[:,1], self.volume_points[:,2]
-
-    def six(self):
-        ''' Useful to extract values from a map using map[region.six()] '''
-        return self.surface_points[:,0], self.surface_points[:,1], self.surface_points[:,2]
+        # Remove pockets that are contained in other pockets if they have a lower score
+        pockets = [p for p in pockets if all(p.score >= q.score for q in pockets if p.regions < q.regions)]
+        return pockets

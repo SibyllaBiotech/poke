@@ -1,6 +1,8 @@
 import numpy as np
 import numba as nb
 
+from .utils import compute_box, average_3d, fetch_3d, intersect_box, is_reachable
+
 @nb.njit(cache=True, fastmath=True, nogil=True)
 def compute_low_resolution_grid(energy_map: np.ndarray, grid_cutoff: float, 
                  neighbours: np.ndarray, grid_positions: np.ndarray, 
@@ -93,7 +95,8 @@ def compute_low_resolution_grid(energy_map: np.ndarray, grid_cutoff: float,
 @nb.njit(cache=True, fastmath=True, nogil=True)
 def enhance_volumes(energy_map: np.ndarray, isovalue: float, 
                     neighbours: np.ndarray, grid_positions: np.ndarray,
-                    probe_sigmas2: np.ndarray, probe_epsilons: np.ndarray, sigma_charges: np.ndarray):
+                    probe_sigmas2: np.ndarray, probe_epsilons: np.ndarray, sigma_charges: np.ndarray,
+                    min_spot_points: int):
     '''
         Expand the low-energy regions found in the low-resolution map. This expansion is 
         carried out on the high-resolution map by computing the potential in the missing positions.
@@ -126,6 +129,9 @@ def enhance_volumes(energy_map: np.ndarray, isovalue: float,
 
                 # Find first point belonging to new pocket (root of graph)
                 if energy_map[i,j,k,0] < isovalue and not inserted[i,j,k]:
+
+                    if n_pockets+1 >= pockets_slicer.shape[0]:
+                        break
 
                     # New pocket found
                     n_pockets += 1
@@ -201,14 +207,30 @@ def enhance_volumes(energy_map: np.ndarray, isovalue: float,
 
                     pockets_slicer[n_pockets] = n_inserted
                     surfaces_slicer[n_pockets] = n_surfaces
-                    
-                    # check for IndexError & return 
-                    if n_pockets+1 >= pockets_slicer.shape[0]:
-                        return (inserted, pockets_points[:n_inserted],  pockets_slicer, 
-                                          surfaces_points[:n_surfaces], surfaces_slicer)
-    
-    return (inserted, pockets_points[:n_inserted],   pockets_slicer[:n_pockets+1], 
-                      surfaces_points[:n_surfaces], surfaces_slicer[:n_pockets+1])
+        
+
+
+    # Convert the regions into objects
+    i_region = 0
+    regions = []
+
+    for i in range(n_pockets):
+        if pockets_slicer[i+1]-pockets_slicer[i] >= min_spot_points:
+            volume_points = pockets_points[pockets_slicer[i]:pockets_slicer[i+1]]
+            surface_points = surfaces_points[surfaces_slicer[i]:surfaces_slicer[i+1]]
+
+            # Build tuples of the form (region_id, volume_points, surface_points, box, (atoms, net_vector, net_count))
+            regions.append((
+                i_region,
+                volume_points,
+                surface_points,
+                compute_box(surface_points),
+                get_region_atoms(surface_points, neighbours=neighbours, grid_positions=grid_positions, k_nearest=5),
+            ))
+
+            i_region += 1
+
+    return regions
 
 
 @nb.njit(cache=True, fastmath=True, nogil=True)
@@ -335,114 +357,7 @@ def compute_star_points(px: int, py: int, pz: int, energy_map: np.ndarray,
         energy_map[px,py,pz-1,1] = elec_zm
 
     return energy_xp, energy_xm, energy_yp, energy_ym, energy_zp, energy_zm
-
-@nb.njit(cache=True, fastmath=True, nogil=True)
-def compute_real_elec(points: np.ndarray, positions: np.ndarray, charges: np.ndarray):
-    elec = np.empty(points.shape[0])
-    for i in range(points.shape[0]):
-        el = 0
-        for j in range(positions.shape[0]):
-            el += charges[j] / np.linalg.norm(points[i] - positions[j])**2
-        elec[i] = el
-    return elec
-
     
-
-@nb.njit(cache=True, fastmath=True, nogil=True)
-def intersect_box(box1: np.ndarray, box2: np.ndarray, threshold: float):
-    ''' 
-        Return true if there is an intersection between box1 and box2
-    '''
-    return (box1[0,0] - threshold < box2[1,0] and box1[1,0] + threshold > box2[0,0] and
-            box1[0,1] - threshold < box2[1,1] and box1[1,1] + threshold > box2[0,1] and
-            box1[0,2] - threshold < box2[1,2] and box1[1,2] + threshold > box2[0,2])
-
-@nb.njit(cache=True, fastmath=True, nogil=True)   
-def is_reachable(points1, points2, threshold, grid_positions, probe_sigmas2, neighbours):
-    '''
-        Return True if there is a segment shorter than the threshold connecting 
-        points1 with points2, and this segment does not intersect any atom. 
-    '''
-    threshold2 = threshold**2
-
-    for p1 in range(points1.shape[0]):
-        p1x = points1[p1,0]
-        p1y = points1[p1,1]
-        p1z = points1[p1,2]
-
-        for p2 in range(points2.shape[0]):
-            p2x = points2[p2,0]
-            p2y = points2[p2,1]
-            p2z = points2[p2,2]
-
-            dx = p2x-p1x
-            dy = p2y-p1y
-            dz = p2z-p1z
-            d2 = dx*dx + dy*dy + dz*dz
-
-            if d2 < threshold2:
-                # Check that the segment connecting p1 and p2 does not cross 
-                # a barrier in the energy map. 
-                max_delta = max(np.abs(dx),np.abs(dy),np.abs(dz))
-
-                # Rescale the direction vector making the largest coordinate equal to 1 
-                # It's an equivalent version of the Bresenham's line algorithm
-                slope_x = dx / max_delta
-                slope_y = dy / max_delta
-                slope_z = dz / max_delta
-                
-                good = True
-                for k in range(2, max_delta-1):
-
-                    # Compute the point on the segment to test
-                    px = p1x + slope_x * k
-                    py = p1y + slope_y * k
-                    pz = p1z + slope_z * k
-
-                    kx4 = np.int32(px * 0.25 + 0.5)
-                    ky4 = np.int32(py * 0.25 + 0.5)
-                    kz4 = np.int32(pz * 0.25 + 0.5)
-
-                    n_neighbours = neighbours[kx4,ky4,kz4,0]
-                    i_neighbours = neighbours[kx4,ky4,kz4,1:]
-
-                    for i_neighbour in range(n_neighbours):
-                        i = i_neighbours[i_neighbour]
-
-                        # Retrieve the atom's position in grid coordinates
-                        nx = grid_positions[i,0]
-                        ny = grid_positions[i,1]
-                        nz = grid_positions[i,2]
-
-                        # Van der Waals composition rules between the atom and the probe
-                        sigma2 = probe_sigmas2[i]
-
-                        px_nx = px-nx
-                        py_ny = py-ny
-                        pz_nz = pz-nz
-
-                        r2 = px_nx*px_nx + py_ny*py_ny + pz_nz*pz_nz
-
-                        # Does the line intersect the atom?
-                        if r2 < 0.8 * sigma2:
-                            good = False
-                            break
-
-                    # There is no need to proceed with this segment 
-                    # if the line intersects the atom.
-                    # we can skip and move on to the next segment.
-                    if not good:
-                        break
-                
-                # If the entire line has been traversed without intersecting any atoms, 
-                # then the regions are connected.
-                if good:
-                    return True
-    
-    # Connecting the regions was unfeasible
-    return False
-
-
 @nb.njit(cache=True, fastmath=True, nogil=True)   
 def get_region_atoms(points, neighbours, grid_positions, k_nearest):
     '''
@@ -509,7 +424,7 @@ def get_region_atoms(points, neighbours, grid_positions, k_nearest):
                 net_count += 1
                 
 
-    return np.array(sorted(atoms)), np.linalg.norm(net_vector / net_count)
+    return atoms, net_vector, net_count
 
 
 @nb.njit(cache=True, fastmath=True, nogil=True) 
@@ -538,112 +453,102 @@ def get_pockets(positions: np.ndarray, inverse_spacing: float, grid_cutoff: floa
                     grid_positions, probe_sigmas2, 
                     probe_epsilons, sigma_charges)
     
-    _, pockets_points, pockets_slicer, surfaces_points, surfaces_slicer = enhance_volumes(
+    # Compute the energy on the high-resolution grid and separate the regions
+    regions = enhance_volumes(
             energy_map, energy_threshold, 
             neighbours, grid_positions,
-            probe_sigmas2, probe_epsilons, sigma_charges)
-
-    # Convert the regions into objects
-    regions = [
-        (
-            pockets_points[pockets_slicer[i]:pockets_slicer[i+1]],
-            surfaces_points[surfaces_slicer[i]:surfaces_slicer[i+1]],
-            compute_box(surfaces_points[surfaces_slicer[i]:surfaces_slicer[i+1]]),
-            i
-        )
-        for i in range(pockets_slicer.shape[0]-1)
-            if pockets_slicer[i+1]-pockets_slicer[i] >= min_spot_points
-    ]
+            probe_sigmas2, probe_epsilons, sigma_charges, min_spot_points=min_spot_points)
 
     groups = cluster_regions(regions=regions, grid_positions=grid_positions, neighbours=neighbours,
                     probe_sigmas2=probe_sigmas2, max_bulk_distance=max_bulk_distance,
                     max_spot_distance=max_spot_distance, min_points=min_points)
 
-    return origin, groups, energy_map, grid_positions, neighbours, grid_positions, neighbours
+    return [compute_descriptors(origin, group, energy_map=energy_map) for group in groups]
 
-@nb.njit(cache=True, fastmath=True, nogil=True)
-def compute_box(array: np.ndarray):
-    box = np.empty((2,3), dtype=array.dtype)
-
-    box[0] = array[0]
-    box[1] = array[1]
-
-    for i in range(1, array.shape[0]):
-        box[0,0] = min(box[0,0], array[i,0])
-        box[1,0] = max(box[1,0], array[i,0])
-
-        box[0,1] = min(box[0,1], array[i,1])
-        box[1,1] = max(box[1,1], array[i,1])
-
-        box[0,2] = min(box[0,2], array[i,2])
-        box[1,2] = max(box[1,2], array[i,2])
-
-    return box
 
 @nb.njit(cache=True, fastmath=True, nogil=True)
 def cluster_regions(regions: list[tuple], grid_positions: np.ndarray, neighbours: np.ndarray,
                     probe_sigmas2: np.ndarray, max_bulk_distance: float, max_spot_distance: float,
                     min_points: int) -> tuple[np.ndarray, np.ndarray]:
     '''
-        Divide the regions into big sections (bodies) and small sections (spots). 
-        The spots that are in close proximity to a body will be included within it.
-        For each (body + near spots) a Pocket object will be returned.
+        This function clusters the regions into groups. The regions are considered connected if
+        they are close enough with respect to the bulk distance and if they are reachable from each other.
+        Additionally spots regions are added to the groups if they are close enough with respect to the spot distance.
     '''
-    groups = [[regions[0]]]
+    # Initialize the connectivity matrix between the regions
+    connectivity_bluk = np.zeros((len(regions), len(regions)), dtype=np.int8)
+    connectivity_spot = np.zeros((len(regions), len(regions)), dtype=np.int8)
 
-    # Agglomerative clustering with max_bulk_distance
-    for region in regions[1:]:
+    # Compute the connectivity between the regions
+    for i in range(len(regions)):
+        
+        for j in range(i):
 
-        # Regions that are reachable from this region
-        # and the groups not reachable
-        reachable_regions = [region]
-        unreachable_groups = []
+            # Check if the two regions are close enough with respect to the spot distance
+            if intersect_box(regions[i][3], regions[j][3], max_spot_distance):
+                if is_reachable(regions[i][2], regions[j][2], max_spot_distance, grid_positions, probe_sigmas2, neighbours):
+                    connectivity_spot[i,j] = 1
+                    connectivity_spot[j,i] = 1
 
-        # For each group:
-        #   if reachable 
-        #       all its regions go to reachable_regions
-        #   else if not reachable 
-        #       go in unreachable_groups
+                    # Check if the two regions are close enough with respect to the bulk distance
+                    if intersect_box(regions[i][3], regions[j][3], max_bulk_distance):
+                        if is_reachable(regions[i][2], regions[j][2], max_bulk_distance, grid_positions, probe_sigmas2, neighbours):
+                            connectivity_bluk[i,j] = 1
+                            connectivity_bluk[j,i] = 1
+        connectivity_bluk[i,i] = 1
+        connectivity_spot[i,i] = 1
+                    
+
+    # Find all possible groups of connected regions
+    groups = []
+    for region in regions:
+
+        # Groups that are reachable from the current region
+        reachable_groups = []
+
         for group in groups:
             reachable = False
 
             # Check if group is reachable comparing all the regions of the group
             for group_region in group:
-                if intersect_box(region[2], group_region[2], max_bulk_distance):
-                   if is_reachable(region[1], group_region[1], max_bulk_distance, grid_positions, probe_sigmas2, neighbours): 
-                        reachable = True 
-                        break
+                if connectivity_bluk[region[0], group_region[0]]:
+                    reachable = True 
+                    break
             
             if reachable:
-                reachable_regions.extend(group)
-            else:
-                unreachable_groups.append(group)
+                reachable_groups.append(group)
 
-        # The new list of groups is the unreachable_groups with appended the merged reachable_regions
-        groups = unreachable_groups
-        groups.append(reachable_regions)
+        # Security check to avoid too many groups
+        reachable_groups = reachable_groups[:4]
 
-    # For each region:
-    #   for each group:
-    #       if the region is not present in the group
-    #           if the region reach the group with max_spot_distance
-    #               add the region to the group 
+        # Produce all the partitions of reachable_groups
+        for i in range(2 ** len(reachable_groups)):
+            group = [region]
+
+            p = 0
+            while i > 0:
+                group.extend(reachable_groups[p])
+                i = i // 2
+                p += 1
+
+            groups.append(group)
+
+    # Add spots that are reachable from the groups
     for region in regions:
         for group in groups:
             
             # Stupid numba way to check if region in group
             region_in_group = False
             for group_region in group:
-                if region[3] == group_region[3]:
+                if region[0] == group_region[0]:
                     region_in_group = True
                     break
 
             if not region_in_group:
                 for group_region in group:
-                    if intersect_box(region[2], group_region[2], max_spot_distance):
-                        if is_reachable(region[1], group_region[1], max_spot_distance, grid_positions, probe_sigmas2, neighbours): 
-                            group.append(region) 
-                            break
+                    if connectivity_spot[region[0], group_region[0]]:
+                        groups.append(group + [region])
+                        break
 
     # Stupid numba way to do big_groups = [group.n_points >= min_points for group in groups]                     
     big_groups = []
@@ -652,19 +557,83 @@ def cluster_regions(regions: list[tuple], grid_positions: np.ndarray, neighbours
         n_points = 0
 
         for region in group:
-            n_points += region[0].shape[0]
+            n_points += region[1].shape[0]
 
         if n_points >= min_points:
             big_groups.append(group)
 
-
+    # Remove duplicate groups
+    final_groups = []
     unique_groups = []
 
-    # for group in groups:
-    #     jk
-    
+    for group in big_groups:
+        group_set = set([region[0] for region in group])
 
-    return big_groups
+        if group_set not in unique_groups:
+            unique_groups.append(group_set)
+            final_groups.append(group)
 
+    return final_groups
 
+@nb.njit(cache=True, fastmath=True, nogil=True)
+def compute_descriptors(origin: np.ndarray, group: list[tuple], energy_map: np.ndarray):
+    '''
+        This function computes the descriptors of a group of regions.
 
+        - volume_points: the points inside the regions
+        - surface_points: the points on the surface of the regions
+        - regions: the indexes of the regions
+        - atoms: the indexes of the atoms around the surface_points
+        - enclosure: the enclosure of the surface_points
+        - lengths: the lengths of the surface_points
+        - energy: the energy of the volume_points
+        - electro: the electrostatic potential of the volume_points
+    '''
+    # Concatenate the points of the regions
+    n_volume_points = 0
+    n_surface_points = 0
+
+    for region in group:
+        n_volume_points += region[1].shape[0]
+        n_surface_points += region[2].shape[0]
+
+    volume_points = np.empty((n_volume_points, 3), dtype=np.int16)
+    surface_points = np.empty((n_surface_points, 3), dtype=np.int16)
+    regions = set([region[0] for region in group])
+
+    i_volume_points = 0
+    i_surface_points = 0
+    for region in group:
+        volume_points[i_volume_points:i_volume_points+region[1].shape[0]] = region[1]
+        surface_points[i_surface_points:i_surface_points+region[2].shape[0]] = region[2]
+        i_volume_points += region[1].shape[0]
+        i_surface_points += region[2].shape[0]
+
+    # Concatenate the atoms of the regions
+    atoms = set()
+    net_vector = np.zeros(shape=3, dtype=np.float32)
+    net_count = 0
+
+    for region in group:
+        atoms.update(region[4][0])
+        net_vector += region[4][1]
+        net_count += region[4][2]
+
+    net_norm = np.linalg.norm(net_vector / net_count)
+
+    # The enclosure is computed using the length of the net vector
+    # when the net vector is short the enclosure is near 1
+    # when the net vector is long the enclosure is near 0
+    enclosure = np.exp(-0.3 * net_norm**2)
+
+    # Compute three orthogonal lengths of the pocket diagonalizing the autocorrelation matrix
+    residuals = surface_points - average_3d(surface_points)
+    variances = np.linalg.eigvalsh(np.dot(residuals.T, residuals)) / residuals.shape[0]
+    lengths = np.sqrt(variances)[::-1]
+
+    # Extract the electrostatic potential
+    energy = fetch_3d(energy_map, volume_points, 0) 
+    electro = fetch_3d(energy_map, volume_points, 1)
+
+    # Return the descriptors
+    return origin.copy(), volume_points, surface_points, regions, np.array(sorted(atoms)), enclosure, lengths, energy, electro
