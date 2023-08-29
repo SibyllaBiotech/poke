@@ -88,10 +88,6 @@ def compute_low_resolution_grid(energy_map: np.ndarray, grid_cutoff: float,
                     energy_map[kx,ky,kz,0] += epsilon * (ir12 - ir6)
                     energy_map[kx,ky,kz,1] += charge * ir6
 
-    # Add the strength (absolute value) of the eletrostatic potential to the Van der Waals energy 
-    # energy_map[::4,::4,::4, 0] -= np.abs(energy_map[::4,::4,::4, 1])
-
-
 @nb.njit(cache=True, fastmath=True, nogil=True)
 def enhance_volumes(energy_map: np.ndarray, isovalue: float, 
                     neighbours: np.ndarray, grid_positions: np.ndarray,
@@ -208,12 +204,14 @@ def enhance_volumes(energy_map: np.ndarray, isovalue: float,
                     pockets_slicer[n_pockets] = n_inserted
                     surfaces_slicer[n_pockets] = n_surfaces
         
-
-
     # Convert the regions into objects
     i_region = 0
+
+    # List of tuples of the form (region_id, volume_points, surface_points, box, (atoms, net_vector, net_count))
     regions = []
 
+    # The regions are separated by the pockets_slicer and surfaces_slicer arrays
+    # which contain the indices of the first point of each region
     for i in range(n_pockets):
         if pockets_slicer[i+1]-pockets_slicer[i] >= min_spot_points:
             volume_points = pockets_points[pockets_slicer[i]:pockets_slicer[i+1]]
@@ -332,27 +330,21 @@ def compute_star_points(px: int, py: int, pz: int, energy_map: np.ndarray,
 
     # Save the computed values in the map
     if compute_xp:
-        # energy_xp -= np.abs(elec_xp)
         energy_map[px+1,py,pz,0] = energy_xp
         energy_map[px+1,py,pz,1] = elec_xp
     if compute_xm:
-        # energy_xm -= np.abs(elec_xm)
         energy_map[px-1,py,pz,0] = energy_xm
         energy_map[px-1,py,pz,1] = elec_xm
     if compute_yp:
-        # energy_yp -= np.abs(elec_yp)
         energy_map[px,py+1,pz,0] = energy_yp
         energy_map[px,py+1,pz,1] = elec_yp
     if compute_ym:
-        # energy_ym -= np.abs(elec_ym)
         energy_map[px,py-1,pz,0] = energy_ym
         energy_map[px,py-1,pz,1] = elec_ym
     if compute_zp:
-        # energy_zp -= np.abs(elec_zp)
         energy_map[px,py,pz+1,0] = energy_zp
         energy_map[px,py,pz+1,1] = elec_zp
     if compute_zm:
-        # energy_zm -= np.abs(elec_zm)
         energy_map[px,py,pz-1,0] = energy_zm
         energy_map[px,py,pz-1,1] = elec_zm
 

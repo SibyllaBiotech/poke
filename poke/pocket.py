@@ -8,7 +8,7 @@ class Pocket:
         present.              
     '''
     def __init__(self, origin: np.ndarray, spacing: np.ndarray, 
-                 volume_points: np.ndarray, surface_points: np.ndarray, 
+                 volume_points: np.ndarray, surface_points: np.ndarray, regions: set[int],
                  energy: np.ndarray, electro: np.ndarray,
                  atoms: np.ndarray, charges: np.ndarray, lengths: np.ndarray, enclosure: float) -> None:
         '''
@@ -20,6 +20,7 @@ class Pocket:
         self.electro = electro
         self.volume_points = volume_points
         self.surface_points = surface_points
+        self.regions = regions
         self.atoms = atoms
         self.charges = charges
         self.lengths = lengths

@@ -8,8 +8,7 @@ import numpy as np
 from pathlib import Path
 from .pocket import Pocket
 from .parametrizer import AtomsParametrizer, charmm
-from .algorithms import compute_low_resolution_grid, enhance_volumes, \
-                        intersect_box, is_reachable, get_region_atoms, get_pockets
+from .algorithms import get_pockets
 
 class Poke:
     scoring_models = {}
@@ -55,17 +54,18 @@ class Poke:
                 are kept as pockets. 
                 By selecting lower values, the resultant pockets 
                 will be of reduced size yet possess stronger affinity.
-            min_body_volume: float
-                A region under the threshold can be used as a pocket only
-                if it has a volume greater of this value.
-                Using lower values will result in the generation of smaller pockets.
-            min_spot_volume: float
-                Small low-energy regions (spots) around a pocket, which are greater than min_spot_volume 
-                are included in the output pocket. 
+            min_volume: float
+                Minimum volume of a pocket in cubic angstroms.
+                Pockets with a smaller volume are discarded.
+            max_bulk_distance: float
+                Regions within this distance are merged together to form the bulk in a
+                recursive manner. Increasing this value less pockets are found, but they are bigger.
             max_spot_distance: float
-                Only regions within a distance less than this value are included in
-                the output. 
+                Regions within this distance relative to the bulk are merged in the pocket.
+                The assignment is not recoursive.
         '''
+
+        # Store the parameters
         self.spacing = spacing
         self.inverse_spacing = 1 / spacing
         self.cutoff = cutoff
@@ -78,16 +78,20 @@ class Poke:
         self.max_bulk_distance = max_bulk_distance * self.inverse_spacing
         self.max_spot_distance = max_spot_distance * self.inverse_spacing
 
+        # Store the atoms' properties
         self.charges = charges
         self.sigmas = sigmas
         self.epsilons = epsilons
 
+        # Compute the combined sigmas and epsilons
+        # using the probe sigma and the sigma and epsilon of the atoms
         combined_sigmas = 0.5 * (sigmas + self.probe_sigma)
-
         self.probe_sigmas2 = (combined_sigmas * self.inverse_spacing)**2 
         self.probe_epsilons = 6.26 * np.sqrt(epsilons)
         self.sigma_charges = self.electro_force * self.charges / combined_sigmas**6
 
+        # Load the scoring model if it is not already loaded
+        # The scoring model is a machine learning model that predicts the druggability of a pocket
         if scoring_model not in Poke.scoring_models:
             Poke.scoring_models[scoring_model] = pickle.loads((Path(__file__).parent / f'{scoring_model}.pickle').read_bytes())
         self.scoring_model = Poke.scoring_models[scoring_model]
@@ -152,6 +156,8 @@ class Poke:
             pockets: list[Pocket]
                 the list of pockets
         '''
+
+        # Call the numba function to compute the pockets
         pockets_raw = get_pockets(positions=positions, inverse_spacing=self.inverse_spacing,
                         grid_cutoff=self.grid_cutoff, energy_threshold=self.energy_threshold,
                         probe_sigmas2=self.probe_sigmas2, probe_epsilons=self.probe_epsilons,
