@@ -58,7 +58,7 @@ def average_3d(array: np.ndarray):
     return sum / array.shape[0]
 
 @nb.njit(cache=True, fastmath=True, nogil=True)
-def fetch_3d(map: np.ndarray, points: np.ndarray, i: int):
+def fetch_3d(map: np.ndarray, points: np.ndarray, m: int):
     '''
     Fetch the values of the map at the specified points.
 
@@ -68,7 +68,7 @@ def fetch_3d(map: np.ndarray, points: np.ndarray, i: int):
             The map
         points: np.ndarray (K,3)
             The points
-        i: int
+        k: int
             The index of the map to fetch
 
     Return values
@@ -79,7 +79,7 @@ def fetch_3d(map: np.ndarray, points: np.ndarray, i: int):
     values = np.empty(points.shape[0], dtype=map.dtype)
 
     for i in range(points.shape[0]):
-        values[i] = map[points[i,0], points[i,1], points[i,2], i]
+        values[i] = map[points[i,0], points[i,1], points[i,2], m]
     return values
 
 
