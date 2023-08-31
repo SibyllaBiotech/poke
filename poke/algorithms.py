@@ -205,10 +205,10 @@ def enhance_volumes(energy_map: np.ndarray, isovalue: float,
                     surfaces_slicer[n_pockets] = n_surfaces
         
     # Convert the regions into objects
-    i_region = 0
+    i_region: int = 0
 
     # List of tuples of the form (region_id, volume_points, surface_points, box, (atoms, net_vector, net_count))
-    regions = []
+    regions: list[tuple[int, np.ndarray, np.ndarray, np.ndarray, tuple[set[int], np.ndarray, int]]] = []
 
     # The regions are separated by the pockets_slicer and surfaces_slicer arrays
     # which contain the indices of the first point of each region
@@ -499,17 +499,13 @@ def cluster_regions(regions: list[tuple], grid_positions: np.ndarray, neighbours
         reachable_groups = []
 
         for group in groups:
-            reachable = False
 
             # Check if group is reachable comparing all the regions of the group
             for group_region in group:
                 if connectivity_bluk[region[0], group_region[0]]:
-                    reachable = True 
+                    reachable_groups.append(group)
                     break
             
-            if reachable:
-                reachable_groups.append(group)
-
         # Security check to avoid too many groups
         reachable_groups = reachable_groups[:4]
 
@@ -519,7 +515,8 @@ def cluster_regions(regions: list[tuple], grid_positions: np.ndarray, neighbours
 
             p = 0
             while i > 0:
-                group.extend(reachable_groups[p])
+                if i % 2:
+                    group.extend(reachable_groups[p])
                 i = i // 2
                 p += 1
 

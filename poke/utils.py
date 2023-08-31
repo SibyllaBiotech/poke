@@ -19,7 +19,7 @@ def compute_box(array: np.ndarray):
     box = np.empty((2,3), dtype=array.dtype)
 
     box[0] = array[0]
-    box[1] = array[1]
+    box[1] = array[0]
 
     for i in range(1, array.shape[0]):
         box[0,0] = min(box[0,0], array[i,0])
