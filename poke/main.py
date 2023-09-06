@@ -151,7 +151,7 @@ def main():
 
             # Sort the pockets
             if args.sort and frames and pockets:
-                frames, pockets = zip(*sorted(zip(frames, pockets), key=lambda fp: PocketEvaluator.evaluate(args.sort, fp[1][0], atoms), reverse=True))
+                frames, pockets = zip(*sorted(zip(frames, pockets), key=lambda fp: PocketEvaluator.evaluate(args.sort, fp[1][0], atoms_scouter), reverse=True))
 
             if args.max_output_frames is not None:
                 frames = frames[:args.max_output_frames]
@@ -292,7 +292,7 @@ def write_desciptors(out_dir, atoms: AtomGroup, pockets: list[Pocket], frames: l
                     id,  
                     *(f'{v:.2g}' for v in props.values()),
                     ' '.join(map(str, atoms[p.atoms].residues.resids)),
-                    ' '.join(map(str, p.atoms))
+                    ' '.join(map(str, atoms[p.atoms].ids))
                 ))
 
 def plot_desciptors(out_dir, pockets: list[Pocket]):
