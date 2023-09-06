@@ -153,17 +153,22 @@ class Pocket:
 
     def props(self):
         return {
-            'Score': self.score, 
-            'Volume': self.volume, 
-            'Surface': self.surface, 
-            'Lenght1': self.lengths[0],
-            'Length2': self.lengths[1], 
-            'Length3': self.lengths[2], 
-            'Hydrophobicity': self.hydrophobicity,
-            'Enclosure': self.enclosure,
-            '#PolarAtoms': self.n_polar_atoms, 
-            '#ChargedAtoms': self.n_charges_atoms,
+            k: getattr(self, v[0]) if len(v) == 2 else getattr(self, v[0])[v[2]]
+            for k, v in self.properties.items()
         }
 
     def __repr__(self) -> str:
         return f'<Pocket volume={self.volume:.1f} #atoms={len(self.atoms)}>'
+    
+    properties = {
+        'Score': ('score','#f74d75'),
+        'Volume': ('volume','#90be6d'),
+        'Surface': ('surface','#577590'), 
+        'Lenght1': ('lengths', '#43aa8b', 0),
+        'Length2': ('lengths', '#43aa8b', 1),
+        'Length3': ('lengths', '#43aa8b', 2),
+        'Hydrophobicity': ('hydrophobicity', '#f9c74f'),
+        'Enclosure': ('enclosure', '#2a6f97'),
+        '#PolarAtoms': ('n_polar_atoms', '#f8961e'),
+        '#ChargedAtoms': ('n_charges_atoms', '#9b5de5'),
+    }

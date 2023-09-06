@@ -50,6 +50,8 @@ def main():
                         'maximum number of pocket in the output. Only when --sort is used.')
     parser.add_argument('-p', '--pymol', action='store_true', default=False, help=
                         'save a pymol script usable to open the pockets found.')
+    parser.add_argument('-g', '--graph', action='store_true', default=False, help=
+                        'plot distributions of pocket descriptors.')
     parser.add_argument('-k', '--pickle', action='store_true', default=False, help=
                         'save a pickle with a list of pockets for each frame.')
     parser.add_argument('-q', '--quiet', action='store_true', default=False, help=
@@ -164,6 +166,9 @@ def main():
 
             if args.pickle:
                 write_pickle(args, out_dir, pockets)
+
+            if args.graph:
+                plot_desciptors(out_dir, pockets)
         
     except UserError as error:
         print(error)    
@@ -285,6 +290,37 @@ def write_desciptors(out_dir, atoms: AtomGroup, pockets: list[Pocket], frames: l
                     ' '.join(map(str, atoms[p.atoms].residues.resids)),
                     ' '.join(map(str, p.atoms))
                 ))
+
+def plot_desciptors(out_dir, pockets: list[Pocket]):
+    '''
+        Plot the descriptors for each pocket in the list.
+    '''
+    import matplotlib.pyplot as plt
+
+    # Check for POKE_FONT environment variable
+    if 'POKE_FONT' in os.environ:
+        plt.rcParams['font.family'] = os.environ['POKE_FONT']
+
+    color = os.environ['POKE_COLOR'] if 'POKE_COLOR' in os.environ else None
+        
+    (out_dir / 'histograms').mkdir(parents=True, exist_ok=True)
+
+    descriptors = np.array([list(p.props().values()) for pks in pockets for p in pks])
+    names = Pocket.properties.keys()
+
+    for name, values in zip(names, descriptors.T):
+        q25, q50, q75 = np.quantile(values, [0.25, 0.5, 0.75])
+        fig, ax = plt.subplots()
+        ax.hist(values, bins='auto', color=color or Pocket.properties[name][1])    
+        ax.axvline(q25, color='black', ls='--', label=f'Q25: {q25:.2g}')
+        ax.axvline(q50, color='black', ls='-', label=f'Q50: {q50:.2g}')
+        ax.axvline(q75, color='black', ls='--', label=f'Q75: {q75:.2g}')
+        ax.set_xlabel(name)
+        ax.set_ylabel('Counts')
+        ax.legend()
+        fig.tight_layout()
+        fig.savefig(out_dir / 'histograms' / f'{name}.png', dpi=300)
+        plt.close(fig)
 
 def write_pickle(args, out_dir, pockets: list[list[Pocket]]):
     with open_stream(out_dir / 'pockets.pickle', 'wb', args.compress) as stream:
