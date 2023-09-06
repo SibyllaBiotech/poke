@@ -38,8 +38,10 @@ def main():
                         'compute the descriptors and save them in a csv file.')
     parser.add_argument('-v', '--volumes', action='store_true', default=False, help=
                         'save the volumes and save them in a multi-model PDB file.')
-    parser.add_argument('-sel', '--selection', type=str, metavar='', default='all', help=
+    parser.add_argument('-ss', '--selection-scouter', type=str, metavar='', default='all', help=
                         'selection of atoms used by the scouter.')
+    parser.add_argument('-so', '--selection-output', type=str, metavar='', default='all', help=
+                        'selection of atoms written in the output.')
     parser.add_argument('-e', '--extract', action='store_true', default=False, help=
                         'save the results relative to a new trajectory containing only frames with at least one pocket.')
     parser.add_argument('-a', '--align', type=str, metavar='', default=None, help=
@@ -84,10 +86,11 @@ def main():
 
             # Suppress the warning during the opening of the structures
             u = Universe(*structures)
-            atoms = u.select_atoms(args.selection)
+            atoms_scouter = u.select_atoms(args.selection_scouter)
+            atoms_output = u.select_atoms(args.selection_output)
 
             # Initialize the scouter with the atoms 
-            scouter = Poke.from_mdanalysis(atoms)
+            scouter = Poke.from_mdanalysis(atoms_scouter)
 
             frames = []
             pockets = []
@@ -120,14 +123,14 @@ def main():
                 chunksize = max(8, min(u.trajectory.n_frames // args.ncores, args.ncores*2))
 
                 with Pool(processes=args.ncores) as pool: 
-                    iter_frames_pockets = pool.imap(scouter.get_pockets, (atoms.positions for _ in u.trajectory), chunksize=chunksize)
+                    iter_frames_pockets = pool.imap(scouter.get_pockets, (atoms_scouter.positions for _ in u.trajectory), chunksize=chunksize)
 
                     for i, frame_pockets in enumerate(iter_frames_pockets):
                         n_pockets += len(frame_pockets)
 
                         # Apply a filter to the pockets evaluating the args.filter on each pocket
                         if args.filter is not None:
-                            frame_pockets = [p for p in frame_pockets if PocketEvaluator.evaluate(args.filter, p, atoms)]
+                            frame_pockets = [p for p in frame_pockets if PocketEvaluator.evaluate(args.filter, p, atoms_scouter)]
                         n_kept_pockets += len(frame_pockets)
 
                         # If sorting is active only the trajectory will be written with only one pocket per frame
@@ -159,10 +162,10 @@ def main():
 
             # Write atoms anv volumes
             if args.extract or args.sort or args.volumes:
-                write_atoms_and_pockets(args, structures, out_dir, atoms, frames, pockets)
+                write_atoms_and_pockets(args, structures, out_dir, atoms_output, frames, pockets)
 
             if args.descriptors:
-                write_desciptors(out_dir, atoms, pockets, frames)
+                write_desciptors(out_dir, atoms_scouter, pockets, frames)
 
             if args.pickle:
                 write_pickle(args, out_dir, pockets)
@@ -232,7 +235,8 @@ def write_atoms_and_pockets(args, structures: list[Path], out_dir: Path, atoms: 
                 aligner.compute(ts.positions)
                 
             if atoms_writer:
-                atoms.positions = aligner.apply(atoms.positions)
+                if args.align:
+                    atoms.positions = aligner.apply(atoms.positions)
                 atoms_writer.write(atoms)
 
             if pockets_writer:
