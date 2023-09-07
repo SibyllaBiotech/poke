@@ -4,9 +4,9 @@ import gzip
 import argparse
 import warnings
 import pickle
+import multiprocessing
 import numpy as np
 from pathlib import Path
-from multiprocessing import Pool
 
 from poke import Poke, Pocket
 from poke.filter import PocketEvaluator
@@ -110,22 +110,8 @@ def main():
                 n_kept_pockets = 0
                 n_pockets = 0
             
-                # Set number of cores, if not provided by user
-                # Criteria: 
-                # - if trajectory is short, ensure at least 8 frames for each core
-                # - for longer trajectories, ensure the number of cores does not exceed available cores,
-                #   up to a maximum of 32
-                if args.ncores is None:
-                    args.ncores = max(1, min(32, os.cpu_count(), u.trajectory.n_frames // 8))
-
-                # Set chunksize accordingly 
-                # for low number of cores, chunksize is smaller to update progress bar more frequently
-                chunksize = max(8, min(u.trajectory.n_frames // args.ncores, args.ncores*2))
-
-                with Pool(processes=args.ncores) as pool: 
-                    iter_frames_pockets = pool.imap(scouter.get_pockets, (atoms_scouter.positions for _ in u.trajectory), chunksize=chunksize)
-
-                    for i, frame_pockets in enumerate(iter_frames_pockets):
+                with Pool(scouter=scouter, n_frames=u.trajectory.n_frames, n_cores=args.ncores) as pool: 
+                    for i, frame_pockets in enumerate(pool.get_pockets(atoms_scouter.positions for _ in u.trajectory)):
                         n_pockets += len(frame_pockets)
 
                         # Apply a filter to the pockets evaluating the args.filter on each pocket
@@ -144,8 +130,8 @@ def main():
                             frames.append(i)
                             pockets.append(frame_pockets)
                         
-                        if (i+1) % chunksize == 0:
-                            progress_bar.update(task, advance=chunksize, n_kept_pockets=n_kept_pockets, n_pockets=n_pockets)
+                        if (i+1) % pool.chunksize == 0:
+                            progress_bar.update(task, advance=pool.chunksize, n_kept_pockets=n_kept_pockets, n_pockets=n_pockets)
                 
                 progress_bar.update(task, completed=u.trajectory.n_frames, n_kept_pockets=n_kept_pockets, n_pockets=n_pockets)
 
@@ -375,5 +361,47 @@ class Aligner:
     def __call__(self, positions: np.ndarray):
         return self.compute(positions).apply(positions)
 
+
+class Pool:
+    def __init__(self, scouter: Poke, n_frames: int, n_cores: int=None) -> None:
+        self.scouter = scouter
+
+        # Set number of cores, if not provided by user
+        # Criteria: 
+        # - if trajectory is short, ensure at least 8 frames for each core
+        # - for longer trajectories, ensure the number of cores does not exceed available cores,
+        #   up to a maximum of 32
+        if n_cores is None:
+            n_cores = max(1, min(32, os.cpu_count(), n_frames // 8))
+        self.n_cores = n_cores
+
+        if n_cores > 1:
+            self.pool = multiprocessing.Pool(n_cores)
+
+            # Set chunksize accordingly 
+            # for low number of cores, chunksize is smaller to update progress bar more frequently
+            self.chunksize = max(8, min(n_frames // n_cores, n_cores*2))
+        else:
+            self.pool = None
+            self.chunksize = 1
+
+    def __enter__(self):
+        if self.pool:
+            self.pool.__enter__()
+        return self
+        
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.pool:
+            self.pool.__exit__(exc_type, exc_value, traceback)
+
+    def get_pockets(self, frames):
+        if self.pool:
+            # Run the first frame in the main process to avoid 
+            # the numba compilation in the forked processes 
+            yield self.scouter.get_pockets(next(frames))
+            yield from self.pool.imap(self.scouter.get_pockets, frames, chunksize=self.chunksize)
+        else:
+            yield from map(self.scouter.get_pockets, frames)
+             
 class UserError(RuntimeError):
     pass
