@@ -1,4 +1,5 @@
 import os
+import sys
 import csv
 import gzip
 import argparse
@@ -64,6 +65,8 @@ def main():
                         'compress the results using gzip, most of the programs can read them without problem.')
     parser.add_argument('-nc','--ncores', type=int, metavar='', default=None, help=
                         'number of cores used to parallelize the computation of trajectories or multimodel pdb files')
+    parser.add_argument('-ls', '--launch-script', action='store_true', default=False, help=
+                        'save lauch command in a bash script to be able to rerun with the same parameters')
     args = parser.parse_args()
 
     # Precompile filter and sort expressions
@@ -158,6 +161,10 @@ def main():
 
             if args.graph:
                 plot_desciptors(out_dir, pockets)
+            
+            if args.launch_script:
+                with open_stream(out_dir / 'launch.sh', 'wt', compressed=False) as stream:
+                    stream.write('poke ' + ' '.join(sys.argv[1:]) + '\n')
         
     except UserError as error:
         print(error)    
