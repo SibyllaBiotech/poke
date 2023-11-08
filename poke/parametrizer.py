@@ -70,7 +70,7 @@ class AtomsParametrizer:
             return self.atoms_types[best_types]
 
         else:
-            error_msg = f'Some atoms names of residue {resname} are not matching the forcefield:'
+            error_msg = f'Some atoms names of residue {resname} with atoms {", ".join(sorted(input_atoms))} are not matching the forcefield:'
      
             for residue_key in residues:
                 residue = self.residues[residue_key]
