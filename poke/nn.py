@@ -7,6 +7,9 @@ class Linear:
 
     def __call__(self, x):
         return x @ self.weight.T + self.bias
+
+    def __repr__(self) -> str:
+        return f'Linear({self.weight.shape[1]}, {self.weight.shape[0]})'
     
 class BatchNorm1d:
     def __init__(self, module) -> None:
@@ -19,6 +22,9 @@ class BatchNorm1d:
     def __call__(self, x):
         return (x - self.running_mean) / np.sqrt(self.running_var + self.eps) * self.weight + self.bias
     
+    def __repr__(self) -> str:
+        return f'BatchNorm1d({self.weight.shape[0]})'
+    
 class Sigmoid:
     def __init__(self, module) -> None:
         pass
@@ -26,12 +32,18 @@ class Sigmoid:
     def __call__(self, x):
         return 1 / (1 + np.exp(-x))
     
+    def __repr__(self) -> str:
+        return f'Sigmoid()'
+    
 class Dropout:
     def __init__(self, module) -> None:
         pass
 
     def __call__(self, x):
         return x
+    
+    def __repr__(self) -> str:
+        return f'Dropout()'
     
 modules_names = {
     'Linear': Linear,

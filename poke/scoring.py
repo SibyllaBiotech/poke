@@ -14,7 +14,7 @@ import torch.optim as optim
 from torcheval.metrics import R2Score
 
 from pathlib import Path
-from MDAnalysis import AtomGroup, Writer
+from MDAnalysis import Universe, AtomGroup, Writer
 from .pocket import Pocket
 from .writer import PocketWriter
 
@@ -30,14 +30,14 @@ class Scorer(nn.Module):
 
     def __init__(self, in_features: int):
         super(Scorer, self).__init__()
+        n_hidden_1 = 64
 
         self.layers = nn.Sequential(
             nn.BatchNorm1d(in_features),
-            nn.Linear(in_features, 32),
+            nn.Linear(in_features, n_hidden_1),
             nn.Sigmoid(),
-            nn.BatchNorm1d(32),
-            nn.Dropout(0.01),
-            nn.Linear(32, 1),
+            nn.Dropout(0.05),
+            nn.Linear(n_hidden_1, 1),
         )
 
     def forward(self, x):
@@ -56,6 +56,8 @@ class Scorer(nn.Module):
         # Compute the features of each pocket and targets
         train_features = torch.tensor(np.array([p.features() for p in train_pockets]), dtype=torch.float32).to(device)
         train_targets = torch.tensor(train_scores, dtype=torch.float32).unsqueeze(1).to(device)
+
+        print(train_features.shape)
 
         test_features = torch.tensor(np.array([p.features() for p in test_pockets]), dtype=torch.float32).to(device)
         test_targets = torch.tensor(test_scores, dtype=torch.float32).unsqueeze(1).to(device)
@@ -99,14 +101,13 @@ class Scorer(nn.Module):
 
                     if loss < test_loss:
                         consecutive_train_better += 1
-                        if test_features.shape[0] > 20 and consecutive_train_better > 15:
-                            break
                     else:
                         consecutive_train_better = 0
 
                     model.train()
-                    print(f'Epoch {i:<4} Train Loss: {loss:.4g} Test Loss: {test_loss:.4g} Train r2: {train_r2:.4g} Test r2: {test_r2:.4g}')
+                    print(f'Epoch {i:<4} Train Loss: {loss:.4g} Test Loss: {test_loss:.4g} Train r2: {train_r2:.4g} Test r2: {test_r2:.4g}', end='\r')
         except KeyboardInterrupt:
+            print('')
             pass
 
         return model.cpu()
@@ -116,7 +117,9 @@ class Scorer(nn.Module):
         return self(features).detach().numpy().ravel()
         
 
-def dock_molecules_on_pocket(output_dir: Path, atoms: AtomGroup, pocket: Pocket, smiles: list[str], n_cpus: int, docking: bool=True, only_cached: bool=False):
+def dock_molecules_on_pocket(output_dir: Path, atoms: AtomGroup, pocket: Pocket, smiles: list[str], 
+                             n_cpus: int, docking: bool=True, 
+                             only_cached: bool=False, compute_lle: bool=False):
     '''
         Dock a set of molecules inside a pocket.
         A folder will be created inside output_dir containing the results of the docking.
@@ -142,8 +145,10 @@ def dock_molecules_on_pocket(output_dir: Path, atoms: AtomGroup, pocket: Pocket,
     else:
         written_protein_gro = protein_path.read_bytes()
         if protein_gro != written_protein_gro:
-            raise RuntimeError(f'The protein inside {output_dir} is different to the one passed by argument.')
+            written_atoms = Universe(protein_path).atoms
 
+            if written_atoms.n_atoms != atoms.n_atoms or np.any(np.abs(written_atoms.positions - atoms.positions) > 0.1):
+                raise RuntimeError(f'The protein inside {output_dir} is different to the one passed by argument.')
 
     # Find the oriented box with the minimal volume
     origin, box_vectors = pocket.minimal_bounding_box()
@@ -220,10 +225,10 @@ def dock_molecules_on_pocket(output_dir: Path, atoms: AtomGroup, pocket: Pocket,
             for m in already_docked:
                 energies.setdefault(m['smiles'], []).append(float(m['CNNaffinity']))
 
-            import matplotlib.pyplot as plt
-            plt.hist([np.max(e) for e in energies.values()], bins=50)
-            plt.savefig(pocket_dir / 'energies.png', dpi=300)
-            plt.close()
+            # import matplotlib.pyplot as plt
+            # plt.hist([np.max(e) for e in energies.values()], bins=50)
+            # plt.savefig(pocket_dir / 'energies.png', dpi=300)
+            # plt.close()
 
             energies_path = Path(pocket_dir) / 'energies.pickle'
             energies_path.write_bytes(pickle.dumps(energies))
@@ -232,8 +237,7 @@ def dock_molecules_on_pocket(output_dir: Path, atoms: AtomGroup, pocket: Pocket,
     else:
         energies = pickle.loads(energies_path.read_bytes())
 
-    return np.quantile([np.max(e) for e in energies.values()], 0.8)
-    
+    return energies
 
 def search_similary_box(folder: Path, origin: np.ndarray, box_vectors: np.ndarray):
     
@@ -252,7 +256,7 @@ def search_similary_box(folder: Path, origin: np.ndarray, box_vectors: np.ndarra
 
             # Check the similarity between the volume of  
             # this pocket and the one already performed
-            if jaccard_similarity_boxes(box_points, box_volume, info) > 0.8:
+            if jaccard_similarity_boxes(box_points, box_volume, info) > 0.75:
                 return pocket_dir
             
     return None

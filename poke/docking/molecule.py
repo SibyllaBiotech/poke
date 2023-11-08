@@ -7,7 +7,7 @@ from pathlib import Path
 
 from meeko import MoleculePreparation
 from rdkit import Chem
-from rdkit.Chem import AllChem, rdMolTransforms
+from rdkit.Chem import AllChem, rdMolTransforms, Descriptors
 
 class Molecule:
 
@@ -149,6 +149,11 @@ class Molecule:
         
         rdMolTransforms.TransformConformer(self.rdkit.GetConformer(0), matrix)
         return self
+    
+    # Computed props
+    @property
+    def logP(self):
+        return Descriptors.MolLogP(self.rdkit)
 
 class SDFWriter:
     def __init__(self, out: os.PathLike) -> None:
