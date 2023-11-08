@@ -8,6 +8,7 @@ import pickle
 import multiprocessing
 import numpy as np
 from pathlib import Path
+import shlex
 
 from poke import Poke, Pocket
 from poke.filter import PocketEvaluator
@@ -164,7 +165,7 @@ def main():
             
             if args.launch_script:
                 with open_stream(out_dir / 'launch.sh', 'wt', compressed=False) as stream:
-                    stream.write('poke ' + ' '.join(sys.argv[1:]) + '\n')
+                    stream.write('poke ' + shlex.join(sys.argv[1:]) + '\n')
         
     except UserError as error:
         print(error)    
