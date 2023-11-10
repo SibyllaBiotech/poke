@@ -1,3 +1,5 @@
+from functools import cached_property
+
 from .pocket import Pocket
 from MDAnalysis import AtomGroup
 
@@ -17,8 +19,8 @@ class PocketEvaluator:
                 return getattr(self.pocket, key)
         except:
             raise KeyError(key)
-    
-    @property
+
+    @cached_property
     def resids(self):
         return set(self.atoms[self.pocket.atoms].residues.resids)
     
@@ -32,6 +34,19 @@ class PocketEvaluator:
         diff1 = len(self.resids) - intersection
         diff2 = len(residues) - intersection
         return intersection / (intersection + a*diff1 + b*diff2)
+
+
+    def residues(self, *resids: list[int], min_common=None, max_extra=None):
+        list_resids = set(resids)
+        pock_resids = self.resids
+
+        n_common = len(pock_resids & list_resids)
+        n_extra = len(pock_resids) - n_common
+
+        return (
+            (min_common is None or n_common >= min_common) and
+            (max_extra is None or n_extra <= max_extra)
+        )
 
     def evaluate(expr, pocket, atoms):
         return eval(expr, globals(), PocketEvaluator(pocket, atoms))
