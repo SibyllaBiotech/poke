@@ -164,7 +164,7 @@ class Pocket:
         'Score': ('score','#f74d75'),
         'Volume': ('volume','#90be6d'),
         'Surface': ('surface','#577590'), 
-        'Lenght1': ('lengths', '#43aa8b', 0),
+        'Length1': ('lengths', '#43aa8b', 0),
         'Length2': ('lengths', '#43aa8b', 1),
         'Length3': ('lengths', '#43aa8b', 2),
         'Hydrophobicity': ('hydrophobicity', '#f9c74f'),
