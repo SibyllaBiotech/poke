@@ -44,6 +44,8 @@ def main():
                         'selection of atoms used by the scouter.')
     parser.add_argument('-so', '--selection-output', type=str, metavar='', default='all', help=
                         'selection of atoms written in the output.')
+    parser.add_argument('-sf', '--scoring-function', type=str, metavar='', default='model', help=
+                        'scoring function used')
     parser.add_argument('-e', '--extract', action='store_true', default=False, help=
                         'save the results relative to a new trajectory containing only frames with at least one pocket.')
     parser.add_argument('-a', '--align', type=str, metavar='', default=None, help=
@@ -76,6 +78,13 @@ def main():
     if args.sort:
         args.sort = compile(args.sort, __file__, 'eval')
 
+    # Disable parallelization of numpy operations
+    os.environ['OMP_NUM_THREADS'] = '1'
+    os.environ['OPENBLAS_NUM_THREADS'] = '1'
+    os.environ['MKL_NUM_THREADS'] = '1'
+    os.environ['VECLIB_MAXIMUM_THREADS'] = '1'
+    os.environ['NUMEXPR_NUM_THREADS'] = '1'
+
     try:
         # args.structures contains all the inputs in sequence
         # split_structures produce a iterator of chunks to be passed to the Universe constructor
@@ -94,7 +103,7 @@ def main():
             atoms_output = u.select_atoms(args.selection_output)
 
             # Initialize the scouter with the atoms 
-            scouter = Poke.from_mdanalysis(atoms_scouter)
+            scouter = Poke.from_mdanalysis(atoms_scouter, scoring_model=args.scoring_function)
 
             frames = []
             pockets = []
