@@ -37,13 +37,13 @@ class Sigmoid:
     
 class Dropout:
     def __init__(self, module) -> None:
-        pass
+        self.p = module.p
 
     def __call__(self, x):
         return x
     
     def __repr__(self) -> str:
-        return f'Dropout()'
+        return f'Dropout({self.p:g})'
     
 modules_names = {
     'Linear': Linear,
