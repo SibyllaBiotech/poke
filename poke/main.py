@@ -92,6 +92,9 @@ def main():
             u = Universe(*structures)
             atoms_scouter = u.select_atoms(args.selection_scouter)
             atoms_output = u.select_atoms(args.selection_output)
+            scouted_output_mask = np.isin(atoms_output.ix, atoms_scouter.ix)
+            scouted_output_indexes = np.where(scouted_output_mask)[0]
+            extra_output_indexes = np.where(~scouted_output_mask)[0]
 
             # Initialize the scouter with the atoms 
             scouter = Poke.from_mdanalysis(atoms_scouter)
@@ -152,7 +155,7 @@ def main():
 
             # Write atoms anv volumes
             if args.extract or args.sort or args.volumes:
-                write_atoms_and_pockets(args, structures, out_dir, atoms_output, frames, pockets)
+                write_atoms_and_pockets(args, structures, out_dir, atoms_output, frames, pockets, scouted_output_indexes, extra_output_indexes)
 
             if args.descriptors:
                 write_desciptors(out_dir, atoms_scouter, pockets, frames)
@@ -200,7 +203,7 @@ def split_structures(structures: list[Path]):
     if output_list:
         yield output_list
 
-def write_atoms_and_pockets(args, structures: list[Path], out_dir: Path, atoms: AtomGroup, frames: list[int], pockets: list[list[Pocket]]):
+def write_atoms_and_pockets(args, structures: list[Path], out_dir: Path, atoms: AtomGroup, frames: list[int], pockets: list[list[Pocket]], scouted_output_indexes: list[int], extra_output_indexes: list[int]):
     
     if args.align is not None:
         reference = Universe(structures[0])
@@ -248,7 +251,7 @@ def write_atoms_and_pockets(args, structures: list[Path], out_dir: Path, atoms: 
             else:
                 structures_script = structures
 
-            pockets_writer.write_pymol_script(out_dir / 'pymol.pml', structures_script)
+            pockets_writer.write_pymol_script(out_dir / 'pymol.pml', structures_script, scouted_output_indexes=scouted_output_indexes, extra_output_indexes=extra_output_indexes)
 
     finally:
         if atoms_writer:

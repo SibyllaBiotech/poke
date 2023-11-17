@@ -39,7 +39,7 @@ class PocketWriter:
         self.output.write(f'ENDMDL\n')
         self.model_idx += 1
             
-    def write_pymol_script(self, output: os.PathLike, structures: list[os.PathLike]=[], additional_strucutres: dict[str, Path]={}, pockets: os.PathLike=None) :
+    def write_pymol_script(self, output: os.PathLike, structures: list[os.PathLike]=[], additional_strucutres: dict[str, Path]={}, pockets: os.PathLike=None,  scouted_output_indexes: list[int]=[],  extra_output_indexes: list[int]=[]) :
         output = Path(output)
 
         if pockets is None:
@@ -72,11 +72,42 @@ class PocketWriter:
             '',
             *structure_lines,
             '',
+            f'create scouted, model protein and rank {condense_list(scouted_output_indexes)}' if len(scouted_output_indexes) else '',
+            'create surf, scouted',
+            'disable surf',
+            'hide everything, surf',
+            'util.cbaw surf',
+            'show surface, surf',
+            '',
             'set sphere_scale,0.1',
             'set connect_mode,1',
             f'cmd.load(os.path.join(script_path, "{os.path.relpath(pockets, output.parent)}"), "pockets")',
             'spectrum b, blue_white_red, pocket, minimum=-1, maximum=+1',
             'set connect_mode,0',
+            '',
+            f'create extra, model protein and rank {condense_list(extra_output_indexes)}' if len(extra_output_indexes) else '',
+            'delete protein'
         ]))
 
 
+def condense_list(indexes: list[int]):
+    sorted_i = sorted(indexes)
+    ranges = []
+    first = sorted_i[0]
+    last = sorted_i[0]
+    for i in sorted_i[1:]:
+        if i == last + 1:
+            last = i
+        else:
+            if first == last:
+                ranges.append(str(first))
+            else:
+                ranges.append(f'{first}-{last}')
+            first = i
+            last = i
+    if first == last:
+        ranges.append(str(first))
+    else:
+        ranges.append(f'{first}-{last}')
+    
+    return '+'.join(ranges)
