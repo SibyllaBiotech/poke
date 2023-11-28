@@ -44,6 +44,8 @@ def main():
                         'selection of atoms used by the scouter.')
     parser.add_argument('-so', '--selection-output', type=str, metavar='', default='all', help=
                         'selection of atoms written in the output.')
+    parser.add_argument('-sf', '--scoring-function', type=str, metavar='', default='model', help=
+                        'scoring function used')
     parser.add_argument('-e', '--extract', action='store_true', default=False, help=
                         'save the results relative to a new trajectory containing only frames with at least one pocket.')
     parser.add_argument('-a', '--align', type=str, metavar='', default=None, help=
@@ -76,6 +78,13 @@ def main():
     if args.sort:
         args.sort = compile(args.sort, __file__, 'eval')
 
+    # Disable parallelization of numpy operations
+    os.environ['OMP_NUM_THREADS'] = '1'
+    os.environ['OPENBLAS_NUM_THREADS'] = '1'
+    os.environ['MKL_NUM_THREADS'] = '1'
+    os.environ['VECLIB_MAXIMUM_THREADS'] = '1'
+    os.environ['NUMEXPR_NUM_THREADS'] = '1'
+
     try:
         # args.structures contains all the inputs in sequence
         # split_structures produce a iterator of chunks to be passed to the Universe constructor
@@ -85,93 +94,101 @@ def main():
             # first structure in the chunk that usually is the reference (.pdb / .gro)
             out_dir = args.output / '-'.join(fn.stem.split('.', maxsplit=1)[0] for fn in structures)
 
-            # Print the current structures
-            print(f'{" ".join(map(str, structures))} ▶ ./{out_dir}')
-
-            # Suppress the warning during the opening of the structures
-            u = Universe(*structures)
-            atoms_scouter = u.select_atoms(args.selection_scouter)
-            atoms_output = u.select_atoms(args.selection_output)
-            scouted_output_mask = np.isin(atoms_output.ix, atoms_scouter.ix)
-            scouted_output_indexes = np.where(scouted_output_mask)[0]
-            extra_output_indexes = np.where(~scouted_output_mask)[0]
-
-            # Initialize the scouter with the atoms 
-            scouter = Poke.from_mdanalysis(atoms_scouter)
-
-            frames = []
-            pockets = []
-
-            with progress.Progress(
-                    progress.TextColumn('   '),
-                    progress.BarColumn(),
-                    progress.TimeElapsedColumn(),
-                    progress.TextColumn('eta'),
-                    progress.TimeRemainingColumn(),
-                    progress.MofNCompleteColumn(),
-                    FrameSpeedColumn(),
-                    PocketsFoundColumn(),
-                ) as progress_bar:
-
-                task = progress_bar.add_task("scouting", total=u.trajectory.n_frames, n_pockets=0, n_kept_pockets=0)
-                n_kept_pockets = 0
-                n_pockets = 0
-            
-                with Pool(scouter=scouter, n_frames=u.trajectory.n_frames, n_cores=args.ncores) as pool: 
-                    for i, frame_pockets in enumerate(pool.get_pockets(atoms_scouter.positions for _ in u.trajectory)):
-                        n_pockets += len(frame_pockets)
-
-                        # Apply a filter to the pockets evaluating the args.filter on each pocket
-                        if args.filter is not None:
-                            frame_pockets = [p for p in frame_pockets if PocketEvaluator.evaluate(args.filter, p, atoms_scouter)]
-                        n_kept_pockets += len(frame_pockets)
-
-                        # If sorting is active only the trajectory will be written with only one pocket per frame
-                        if args.sort:
-                            for p in frame_pockets:
-                                frames.append(i)
-                                pockets.append([p])
-
-                        # If the args.extract is active, the element is added only if at least one pocket was found
-                        elif not args.extract or len(frame_pockets) > 0:
-                            frames.append(i)
-                            pockets.append(frame_pockets)
-                        
-                        if (i+1) % pool.chunksize == 0:
-                            progress_bar.update(task, advance=pool.chunksize, n_kept_pockets=n_kept_pockets, n_pockets=n_pockets)
-                
-                progress_bar.update(task, completed=u.trajectory.n_frames, n_kept_pockets=n_kept_pockets, n_pockets=n_pockets)
-
-            # Sort the pockets
-            if args.sort and frames and pockets:
-                frames, pockets = zip(*sorted(zip(frames, pockets), key=lambda fp: PocketEvaluator.evaluate(args.sort, fp[1][0], atoms_scouter), reverse=True))
-
-            if args.max_output_frames is not None:
-                frames = frames[:args.max_output_frames]
-                pockets = pockets[:args.max_output_frames]
-
-            # Create the output directory
-            out_dir.mkdir(parents=True, exist_ok=True)
-
-            # Write atoms anv volumes
-            if args.extract or args.sort or args.volumes:
-                write_atoms_and_pockets(args, structures, out_dir, atoms_output, frames, pockets, scouted_output_indexes, extra_output_indexes)
-
-            if args.descriptors:
-                write_desciptors(out_dir, atoms_scouter, pockets, frames)
-
-            if args.pickle:
-                write_pickle(args, out_dir, pockets)
-
-            if args.graph:
-                plot_desciptors(out_dir, pockets)
-            
-            if args.launch_script:
-                with open_stream(out_dir / 'launch.sh', 'wt', compressed=False) as stream:
-                    stream.write('poke ' + shlex.join(sys.argv[1:]) + '\n')
+            # Run the main function in structures
+            run(out_dir, structures, args)
         
     except UserError as error:
-        print(error)    
+        print(error) 
+
+
+def run(out_dir: Path, structures: list[Path], args: argparse.Namespace):
+ 
+    # Print the current structures
+    print(f'{" ".join(map(str, structures))} ▶ ./{out_dir}')
+
+    # Suppress the warning during the opening of the structures
+    u = Universe(*structures)
+    atoms_scouter = u.select_atoms(args.selection_scouter)
+    atoms_output = u.select_atoms(args.selection_output)
+    scouted_output_mask = np.isin(atoms_output.ix, atoms_scouter.ix)
+    scouted_output_indexes = np.where(scouted_output_mask)[0]
+    extra_output_indexes = np.where(~scouted_output_mask)[0]
+
+    # Initialize the scouter with the atoms 
+    scouter = Poke.from_mdanalysis(atoms_scouter, scoring_model=args.scoring_function)
+
+    frames = []
+    pockets = []
+
+    with progress.Progress(
+            progress.TextColumn('   '),
+            progress.BarColumn(),
+            progress.TimeElapsedColumn(),
+            progress.TextColumn('eta'),
+            progress.TimeRemainingColumn(),
+            progress.MofNCompleteColumn(),
+            FrameSpeedColumn(),
+            PocketsFoundColumn(),
+        ) as progress_bar:
+
+        task = progress_bar.add_task("scouting", total=u.trajectory.n_frames, n_pockets=0, n_kept_pockets=0)
+        n_kept_pockets = 0
+        n_pockets = 0
+    
+        with Pool(scouter=scouter, n_frames=u.trajectory.n_frames, n_cores=args.ncores) as pool: 
+            for i, frame_pockets in enumerate(pool.get_pockets(atoms_scouter.positions for _ in u.trajectory)):
+                n_pockets += len(frame_pockets)
+
+                # Apply a filter to the pockets evaluating the args.filter on each pocket
+                if args.filter is not None:
+                    frame_pockets = [p for p in frame_pockets if PocketEvaluator.evaluate(args.filter, p, atoms_scouter)]
+                n_kept_pockets += len(frame_pockets)
+
+                # If sorting is active only the trajectory will be written with only one pocket per frame
+                if args.sort:
+                    for p in frame_pockets:
+                        frames.append(i)
+                        pockets.append([p])
+
+                # If the args.extract is active, the element is added only if at least one pocket was found
+                elif not args.extract or len(frame_pockets) > 0:
+                    frames.append(i)
+                    pockets.append(frame_pockets)
+                
+                if (i+1) % pool.chunksize == 0:
+                    progress_bar.update(task, advance=pool.chunksize, n_kept_pockets=n_kept_pockets, n_pockets=n_pockets)
+        
+        progress_bar.update(task, completed=u.trajectory.n_frames, n_kept_pockets=n_kept_pockets, n_pockets=n_pockets)
+
+    # Sort the pockets
+    if args.sort and frames and pockets:
+        frames, pockets = zip(*sorted(zip(frames, pockets), key=lambda fp: PocketEvaluator.evaluate(args.sort, fp[1][0], atoms_scouter), reverse=True))
+
+    if args.max_output_frames is not None:
+        frames = frames[:args.max_output_frames]
+        pockets = pockets[:args.max_output_frames]
+
+    # Create the output directory
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write atoms anv volumes
+    if args.extract or args.sort or args.volumes:
+        write_atoms_and_pockets(args, structures, out_dir, atoms_output, frames, pockets, scouted_output_indexes, extra_output_indexes)
+
+    if args.descriptors:
+        write_desciptors(out_dir, atoms_scouter, pockets, frames)
+
+    if args.pickle:
+        write_pickle(args, out_dir, pockets)
+
+    if args.graph:
+        plot_desciptors(out_dir, pockets)
+    
+    if args.launch_script:
+        with open_stream(out_dir / 'launch.sh', 'wt', compressed=False) as stream:
+            stream.write('poke ' + shlex.join(sys.argv[1:]) + '\n')
+
+
 
 def split_structures(structures: list[Path]):
     '''
