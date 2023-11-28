@@ -301,6 +301,10 @@ def plot_desciptors(out_dir, pockets: list[Pocket]):
     # Check for POKE_FONT environment variable
     if 'POKE_FONT' in os.environ:
         plt.rcParams['font.family'] = os.environ['POKE_FONT']
+    
+    # Check for POKE_FIGSIZE environment variable. Deafult are 6.4 x 4.8 
+    if 'POKE_FIGSIZE' in os.environ:
+        plt.rcParams['figure.figsize'] = tuple(float(s.strip()) for s in os.environ['POKE_FIGSIZE'].split(','))
 
     color = os.environ['POKE_COLOR'] if 'POKE_COLOR' in os.environ else None
         
