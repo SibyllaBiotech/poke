@@ -8,8 +8,8 @@ class Pocket:
         present.              
     '''
     def __init__(self, origin: np.ndarray, spacing: np.ndarray, 
-                 volume_points: np.ndarray, surface_points: np.ndarray, regions: set[int],
-                 energy: np.ndarray, electro: np.ndarray,
+                 volume_points: np.ndarray, surface_points: np.ndarray, accessible_points: float, 
+                 regions: set[int], energy: np.ndarray, electro: np.ndarray,
                  atoms: np.ndarray, charges: np.ndarray, lengths: np.ndarray, enclosure: float) -> None:
         '''
             Initialize the pocket with the specified values (points and descriptors)   
@@ -20,6 +20,7 @@ class Pocket:
         self.electro = electro
         self.volume_points = volume_points
         self.surface_points = surface_points
+        self.accessible_points = accessible_points
         self.regions = regions
         self.atoms = atoms
         self.charges = charges
@@ -42,6 +43,10 @@ class Pocket:
         return self.surface_points.shape[0] * self.volume_unit**(2/3)
     
     @property
+    def accessible(self):
+        return self.accessible_points.shape[0] * self.volume_unit**(2/3) * 64
+    
+    @property
     def volume_positions(self):
         '''
         Points of the pocket as floating point coordinate 
@@ -54,6 +59,13 @@ class Pocket:
         Points of the pocket as floating point coordinate 
         '''
         return self.origin + self.surface_points @ self.spacing.T
+    
+    @property
+    def accessible_positions(self):
+        '''
+        Points of the pocket as floating point coordinate 
+        '''
+        return self.origin + self.accessible_points @ self.spacing.T
 
     @property
     def electro_histogram(self):
@@ -164,6 +176,7 @@ class Pocket:
         'Score': ('score','#f74d75'),
         'Volume': ('volume','#90be6d'),
         'Surface': ('surface','#577590'), 
+        'Accessible': ('accessible','#f8961e'),
         'Length1': ('lengths', '#43aa8b', 0),
         'Length2': ('lengths', '#43aa8b', 1),
         'Length3': ('lengths', '#43aa8b', 2),

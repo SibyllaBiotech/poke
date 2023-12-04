@@ -172,6 +172,7 @@ class Poke:
                 spacing=np.diag(np.full(3, self.spacing, dtype=np.float32)), 
                 volume_points=volume_points, 
                 surface_points=surface_points,
+                accessible_points=accessible_points,
                 regions=regions,
                 energy=energy,
                 electro=electro,
@@ -180,7 +181,9 @@ class Poke:
                 lengths=lengths,
                 enclosure=enclosure
             )
-            for origin, volume_points, surface_points, regions, atoms, enclosure, lengths, energy, electro in pockets_raw
+            for origin, volume_points, surface_points, 
+                regions, atoms, enclosure, lengths, 
+                energy, electro, accessible_points in pockets_raw
         ]
 
         # Compute the score for each pocket

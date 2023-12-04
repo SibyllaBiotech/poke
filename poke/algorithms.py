@@ -208,8 +208,7 @@ def enhance_volumes(energy_map: np.ndarray, isovalue: float,
     i_region: int = 0
 
     # List of tuples of the form (region_id, volume_points, surface_points, box, (atoms, net_vector, net_count))
-    regions: list[tuple[int, np.ndarray, np.ndarray, np.ndarray, tuple[set[int], np.ndarray, int]]] = []
-
+    regions: list[tuple[int, np.ndarray, np.ndarray, np.ndarray, tuple[set[int], np.ndarray, int]], np.ndarray] = nb.typed.List()
     # The regions are separated by the pockets_slicer and surfaces_slicer arrays
     # which contain the indices of the first point of each region
     for i in range(n_pockets):
@@ -224,6 +223,7 @@ def enhance_volumes(energy_map: np.ndarray, isovalue: float,
                 surface_points,
                 compute_box(surface_points),
                 get_region_atoms(surface_points, neighbours=neighbours, grid_positions=grid_positions, k_nearest=5),
+                compute_accessible_volume(surface_points, energy_map=energy_map, cutoff=2)
             ))
 
             i_region += 1
@@ -418,6 +418,60 @@ def get_region_atoms(points, neighbours, grid_positions, k_nearest):
 
     return atoms, net_vector, net_count
 
+@nb.njit(cache=True, fastmath=True, nogil=True)
+def compute_accessible_volume(points, energy_map: np.ndarray, cutoff=5):
+    accessible_points = set()
+
+    for p in range(points.shape[0]):
+        px = points[p,0]
+        py = points[p,1]
+        pz = points[p,2]
+
+        px4 = ((px + 2) >> 2) << 2
+        py4 = ((py + 2) >> 2) << 2
+        pz4 = ((pz + 2) >> 2) << 2
+
+        # Compute the influence boundaries of this atom
+        min_kx = max(px4-4, 0)
+        min_ky = max(py4-4, 0)
+        min_kz = max(pz4-4, 0)
+        max_kx = min(px4+5, energy_map.shape[0])
+        max_ky = min(py4+5, energy_map.shape[1])
+        max_kz = min(pz4+5, energy_map.shape[2])
+
+        # Use a value of 4 to match the step of the low-resolution grid,
+        # as it's one-fourth the resolution of the original grid.
+        for kx in range(min_kx, max_kx, 4): 
+            dx2 = (kx-px)*(kx-px)
+
+            for ky in range(min_ky, max_ky, 4): 
+                dy2 = (ky-py)*(ky-py)
+                dx2y2 = dx2 + dy2
+
+                for kz in range(min_kz, max_kz, 4):
+                    dz2 = (kz-pz)*(kz-pz)
+
+                    # Distance squared between the atoms 
+                    # and the point on the grid
+                    r2 = dx2y2 + dz2 + 1e-2
+
+                    # Avoid the computation if the atom
+                    # is too far away
+                    if r2 > cutoff**2:
+                        continue
+
+                    if energy_map[kx,ky,kz,0] < 0:
+                        accessible_points.add((kx,ky,kz))
+
+    out = np.empty((len(accessible_points), 3), dtype=np.int16)
+
+    for i, e in enumerate(accessible_points):
+        out[i,0] = e[0]
+        out[i,1] = e[1]
+        out[i,2] = e[2]
+
+    return out
+
 
 @nb.njit(cache=True, fastmath=True, nogil=True) 
 def get_pockets(positions: np.ndarray, inverse_spacing: float, grid_cutoff: float, energy_threshold: float,
@@ -581,22 +635,28 @@ def compute_descriptors(origin: np.ndarray, group: list[tuple], energy_map: np.n
     # Concatenate the points of the regions
     n_volume_points = 0
     n_surface_points = 0
+    n_accessible_points = 0
 
     for region in group:
         n_volume_points += region[1].shape[0]
         n_surface_points += region[2].shape[0]
+        n_accessible_points += region[5].shape[0]
 
     volume_points = np.empty((n_volume_points, 3), dtype=np.int16)
     surface_points = np.empty((n_surface_points, 3), dtype=np.int16)
+    accessible_points = np.empty((n_accessible_points, 3), dtype=np.int16)
     regions = set([region[0] for region in group])
 
     i_volume_points = 0
     i_surface_points = 0
+    i_accessible_points = 0
     for region in group:
         volume_points[i_volume_points:i_volume_points+region[1].shape[0]] = region[1]
         surface_points[i_surface_points:i_surface_points+region[2].shape[0]] = region[2]
+        accessible_points[i_accessible_points:i_accessible_points+region[5].shape[0]] = region[5]
         i_volume_points += region[1].shape[0]
         i_surface_points += region[2].shape[0]
+        i_accessible_points += region[5].shape[0]
 
     # Concatenate the atoms of the regions
     atoms = set()
@@ -625,4 +685,4 @@ def compute_descriptors(origin: np.ndarray, group: list[tuple], energy_map: np.n
     electro = fetch_3d(energy_map, volume_points, 1)
 
     # Return the descriptors
-    return origin.copy(), volume_points, surface_points, regions, np.array(sorted(atoms)), enclosure, lengths, energy, electro
+    return origin.copy(), volume_points, surface_points, regions, np.array(sorted(atoms)), enclosure, lengths, energy, electro, accessible_points
