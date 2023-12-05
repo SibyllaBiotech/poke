@@ -186,6 +186,9 @@ def run(out_dir: Path, structures: list[Path], args: argparse.Namespace):
     
     if args.launch_script:
         with open_stream(out_dir / 'launch.sh', 'wt', compressed=False) as stream:
+            for env_variable in ['POKE_FONT', 'POKE_FIGSIZE', 'POKE_COLOR']:
+                if env_variable in os.environ:
+                    stream.write(f'export {env_variable}="{os.environ[env_variable]}"\n')
             stream.write('poke ' + shlex.join(sys.argv[1:]) + '\n')
 
 
@@ -333,7 +336,10 @@ def plot_desciptors(out_dir, pockets: list[Pocket]):
     for name, values in zip(names, descriptors.T):
         q25, q50, q75 = np.quantile(values, [0.25, 0.5, 0.75])
         fig, ax = plt.subplots()
-        ax.hist(values, bins='auto', color=color or Pocket.properties[name][1])    
+        if name == '#PolarAtoms':
+            ax.hist(values, bins=np.arange(values.min(), values.max()+2) , color=color or Pocket.properties[name][1])    
+        else:
+            ax.hist(values, bins='auto', color=color or Pocket.properties[name][1])    
         ax.axvline(q25, color='black', ls='--', label=f'Q25: {q25:.2g}')
         ax.axvline(q50, color='black', ls='-', label=f'Q50: {q50:.2g}')
         ax.axvline(q75, color='black', ls='--', label=f'Q75: {q75:.2g}')
