@@ -1,9 +1,9 @@
 ![poke](./img/poke-banner.svg)
 
 # Overview
-Poke scouter is a blazing fast pocket scouter based on charmm forcefield. It uses an energy-based approach to identify the low-energy regions of the protein and it is able to compute a set of descriptors for each pocket useful to characterize it. The descriptors are used then by a neural network model to assign a score to the pocket. 
+Poke scouter is a blazing fast pocket scouter based on charmm forcefield. It uses an energy-based approach to identify the low-energy regions of the protein and it is able to compute a set of descriptors for each pocket useful to characterize it. The descriptors are used then by a neural network model to assign a druggability score to the pocket. 
 
-Designed to be used on long molecular dynamics trajectories, but it can be used also on a single frame.
+Designed to be used on long molecular dynamics trajectories, but it can be used also on single frames.
 
 
 ## Installation
@@ -19,7 +19,7 @@ pip install ./poke
 
 ## Getting started
 > [!CAUTION]
-> All the input stuctures passed to *Poke* must be protonated and The name of the atoms should match the charmm or amber conventions.
+> All input stuctures passed to *Poke* must be protonated and the atoms names should match the charmm or amber convention.
 
 *Poke* can be used on a single structure with the following command:
 ```console
@@ -58,7 +58,7 @@ poke -dvp list.txt
 Poke produce a csv file with all the pockets found. The file contains the following columns:
 
 ``OutputFrame``
-  The index of the frame in the output trajectory. When no extraction or sorting is performed it is equal to the input frame.
+  The index of the frame in the output trajectory. When no extraction or sorting is performed it is equal to the input frame. See the section on the output trajectory for more details.
 
 ``OriginalFrame``
   The index of the frame in the input trajectory.
@@ -92,6 +92,40 @@ Poke produce a csv file with all the pockets found. The file contains the follow
 
 ``#ChargedAtoms``
   Number of atoms belonging to the pocket with a absolute partial charge greater than 0.7e.
+
+
+## Output trajectory
+Normally poke does not produce a new trajectory, but it is possible to extract the frames with at least a pocket using the `-e` flag. In this case, the extracted frames are written in a new trajectory file. The frames can be sorted by a property using the `-s` flag. The sorting is performed in descending order. 
+For example to extract the frames with at least a pocket and sort them by the score of the pocket use:
+
+```console
+poke -dvp -e -s score protein.pdb
+```
+
+## Atoms filtering
+It is possible to use only a subset of the atoms in the input file to compute energy maps. The atoms can be selected using the `-ss` flag and a selection string. The selection string must be in the format of the `MDAnalysis` package. For example if the pdb file contains water molecule,  to select only the protein atoms use:
+```console
+poke -dvp -ss "protein" protein.pdb
+```
+Using the `-so` flag it is possible to select the atoms of the input structure that should be written in the output trajectory. Atoms not present in the `-so` selection are anyway used to compute the energy maps unless the `-ss` flag is used to remove them.
+
+## Pocket filtering 
+The pockets can be filtered by properties or by the residues involved. The filtering is performed using the `-f` flag and is a python expression. A pocket is kept only if the expression evaluates to `True`.
+
+For example, to select only the pockets with a volume greater than 100 Å³:
+```console
+poke -dvp -f "volume > 100" protein.pdb
+```
+
+To select only the pockets with a score greater than 6 and with enclosure greater than 0.5 use:
+```console
+poke -dvp -f "score > 6 and enclosure > 0.5" protein.pdb
+```
+
+After the sorting, the `-n` flag can be used to select only the first `n` pockets. For example to select only the best 5 pockets by score use:
+```console
+poke -dvp -s score -n 5 protein.pdb
+```
 
 ## Python package
 The scouter can be used through python to achieve maximum flexibility:
