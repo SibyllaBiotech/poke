@@ -173,15 +173,15 @@ class Pocket:
         return f'<Pocket volume={self.volume:.1f} #atoms={len(self.atoms)}>'
     
     properties = {
-        'Score': ('score','#f74d75'),
-        'Volume': ('volume','#90be6d'),
-        'Surface': ('surface','#577590'), 
-        'Accessible': ('accessible','#f8961e'),
-        'Length1': ('lengths', '#43aa8b', 0),
-        'Length2': ('lengths', '#43aa8b', 1),
-        'Length3': ('lengths', '#43aa8b', 2),
-        'Hydrophobicity': ('hydrophobicity', '#f9c74f'),
-        'Enclosure': ('enclosure', '#2a6f97'),
-        '#PolarAtoms': ('n_polar_atoms', '#f8961e'),
-        '#ChargedAtoms': ('n_charges_atoms', '#9b5de5'),
+        'Score': ('score', {'color': '#f74d75'}),
+        'Volume': ('volume', {'color': '#90be6d'}),
+        'Surface': ('surface', {'color': '#577590'}), 
+        'Accessible': ('accessible', {'color': '#90be6d', 'bins': lambda v: np.arange(v.min(), v.max()+2, step=8)}),
+        'Length1': ('lengths', {'color': '#43aa8b'}, 0),
+        'Length2': ('lengths', {'color': '#43aa8b'}, 1),
+        'Length3': ('lengths', {'color': '#43aa8b'}, 2),
+        'Hydrophobicity': ('hydrophobicity', {'color': '#f9c74f'}),
+        'Enclosure': ('enclosure', {'color': '#2a6f97'}),
+        '#PolarAtoms': ('n_polar_atoms', {'color': '#f8961e', 'bins': lambda v: np.arange(v.min(), v.max()+2)}),
+        '#ChargedAtoms': ('n_charges_atoms', {'color': '#9b5de5'}),
     }
