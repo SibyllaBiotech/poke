@@ -50,6 +50,8 @@ def main():
                         'save the results relative to a new trajectory containing only frames with at least one pocket.')
     parser.add_argument('-a', '--align', type=str, metavar='', default=None, help=
                         'align the given atoms selection to the reference')
+    parser.add_argument('-r', '--reference', type=str, metavar='', default=None, help=
+                        'reference used for alignment. Default is the first structure.')
     parser.add_argument('-s', '--sort', type=str, metavar='', default=None, help=
                         'sorting by the value of an expression.')
     parser.add_argument('-n', '--max-output-frames', type=int, metavar='', default=None, help=
@@ -225,15 +227,26 @@ def split_structures(structures: list[Path]):
 
 def write_atoms_and_pockets(args, structures: list[Path], out_dir: Path, atoms: AtomGroup, frames: list[int], pockets: list[list[Pocket]], scouted_output_indexes: list[int], extra_output_indexes: list[int]):
     
+    if args.reference is not None:
+        reference = Universe(args.reference)
+    else:
+        reference = atoms.universe
+    
     if args.align is not None:
-        reference = Universe(structures[0])
-        aligner = Aligner(reference.select_atoms(args.align))
+        reference_pos = reference.select_atoms(args.align).positions
+        indexes = atoms.universe.select_atoms(args.align).ix
+        # Ensure that the reference and the atoms have the same number of atoms
+        # Better matching of the structures can be implemented in the future
+        reference_pos = reference_pos[:min(len(reference_pos), len(indexes))]
+        indexes = indexes[:min(len(reference_pos), len(indexes))]
+        
+        aligner = Aligner(reference=reference_pos, indexes=indexes)
 
     try:
         atoms_writer = None
         pockets_writer = None
 
-        if args.extract or args.sort:
+        if args.extract or args.sort or args.align:
             atoms_writer = Writer(str(out_dir / 'frames.xtc'), multiframe=True)
             ts = atoms.universe.trajectory[0]
 
@@ -241,6 +254,9 @@ def write_atoms_and_pockets(args, structures: list[Path], out_dir: Path, atoms: 
                 atoms.positions = aligner.compute(ts.positions).apply(atoms.positions)
 
             atoms.write(str(out_dir / 'structure.pdb'))
+
+        if args.reference is not None:
+            reference.atoms.write(str(out_dir / 'reference.pdb'))
         
         if args.volumes:
             pockets_writer = PocketWriter(open_stream(out_dir / 'volumes.pdb', 'wt', args.compress), resid_start=resid_start)
@@ -266,12 +282,13 @@ def write_atoms_and_pockets(args, structures: list[Path], out_dir: Path, atoms: 
                 pockets_writer.write_frame(pks)
 
         if args.pymol:
-            if args.extract or args.sort:
+            if args.extract or args.sort or args.align:
                 structures_script = [out_dir / 'structure.pdb', out_dir / 'frames.xtc']
             else:
                 structures_script = structures
 
-            pockets_writer.write_pymol_script(out_dir / 'pymol.pml', structures_script, scouted_output_indexes=scouted_output_indexes, extra_output_indexes=extra_output_indexes)
+            additional_strucutres = {} if args.reference is None else {'reference': (out_dir / 'reference.pdb', 'brightorange', False)}
+            pockets_writer.write_pymol_script(out_dir / 'pymol.pml', structures_script, additional_strucutres=additional_strucutres, scouted_output_indexes=scouted_output_indexes, extra_output_indexes=extra_output_indexes)
 
     finally:
         if atoms_writer:
@@ -385,9 +402,9 @@ class PocketsFoundColumn(progress.ProgressColumn):
 
 class Aligner:
 
-    def __init__(self, align_group: AtomGroup) -> None:
-        self.indexes   = align_group.ix
-        self.reference = align_group.positions
+    def __init__(self, reference: np.ndarray, indexes: np.ndarray) -> None:
+        self.indexes   = indexes
+        self.reference = reference
 
         self.reference_cog = np.mean(self.reference, axis=0)
         self.reference -= self.reference_cog
