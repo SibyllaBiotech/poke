@@ -59,8 +59,10 @@ class PocketWriter:
             else:
                 structure_lines.append(f'cmd.load_traj(os.path.join(script_path, "{os.path.relpath(fn, output.parent)}"), "protein", state=0)')
 
-        for name, fn in additional_strucutres.items():
+        for name, (fn, color, visible) in additional_strucutres.items():
             structure_lines.append(f'cmd.load(os.path.join(script_path, "{os.path.relpath(fn, output.parent)}"), "{name}")')
+            structure_lines.append(f'color {color}, {name}')
+            visible or structure_lines.append(f'disable {name}')
             
         output.write_text('\n'.join([
             'import os',
