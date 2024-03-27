@@ -234,15 +234,18 @@ def split_structures(structures: list[Path]):
 
 def write_atoms_and_pockets_and_density(args, structures: list[Path], out_dir: Path, atoms: AtomGroup, frames: list[int], pockets: list[list[Pocket]], scouted_output_indexes: list[int], extra_output_indexes: list[int]):
 
-    try: 
-        from gridData import Grid 
-    except ImportError:
-        raise UserError('The gridData package is required to compute the density map. Install it with "pip install gridDataFormats"')
-    
+    if args.reference is not None:
+        reference = Universe(args.reference)
+    else:
+        reference = atoms.universe
+
     if args.density:
+        try: 
+            from gridData import Grid 
+        except ImportError:
+            raise UserError('The gridData package is required to compute the density map. Install it with "pip install gridDataFormats"')
         grid_margin = 5.
         grid_spacing = 1.
-        reference = Universe(structures[0])
         bbox = reference.atoms.bbox()
         bbox = np.array([[x-grid_margin for x in bbox[0]], [x+grid_margin for x in bbox[1]]], dtype=np.float32)
         bbox_start = bbox[0] - grid_margin
@@ -250,13 +253,20 @@ def write_atoms_and_pockets_and_density(args, structures: list[Path], out_dir: P
         grid = np.zeros(shape, dtype=np.float32)
 
     if args.align is not None:
-        aligner = Aligner(reference.select_atoms(args.align))
+        reference_pos = reference.select_atoms(args.align).positions
+        indexes = atoms.universe.select_atoms(args.align).ix
+        # Ensure that the reference and the atoms have the same number of atoms
+        # Better matching of the structures can be implemented in the future
+        reference_pos = reference_pos[:min(len(reference_pos), len(indexes))]
+        indexes = indexes[:min(len(reference_pos), len(indexes))]
+        
+        aligner = Aligner(reference=reference_pos, indexes=indexes)
 
     try:
         atoms_writer = None
         pockets_writer = None
 
-        if args.extract or args.sort:
+        if args.extract or args.sort or args.align:
             atoms_writer = Writer(str(out_dir / 'frames.xtc'), multiframe=True)
             ts = atoms.universe.trajectory[0]
 
@@ -264,6 +274,9 @@ def write_atoms_and_pockets_and_density(args, structures: list[Path], out_dir: P
                 atoms.positions = aligner.compute(ts.positions).apply(atoms.positions)
 
             atoms.write(str(out_dir / 'structure.pdb'))
+        
+        if args.reference is not None:
+            reference.atoms.write(str(out_dir / 'reference.pdb'))
         
         if args.volumes:
             pockets_writer = PocketWriter(open_stream(out_dir / 'volumes.pdb', 'wt', args.compress), resid_start=resid_start)
@@ -299,13 +312,13 @@ def write_atoms_and_pockets_and_density(args, structures: list[Path], out_dir: P
             mdgrid = Grid(grid, origin=bbox_start+(grid_spacing*0.5), delta=np.repeat(grid_spacing, 3))
             mdgrid.export(str(out_dir / 'density.dx'))
 
-        if args.pymol and pockets_writer:
-            if args.extract or args.sort:
+        if args.pymol:
+            if args.extract or args.sort or args.align:
                 structures_script = [out_dir / 'structure.pdb', out_dir / 'frames.xtc']
             else:
                 structures_script = structures
-
-            pockets_writer.write_pymol_script(out_dir / 'pymol.pml', structures_script, scouted_output_indexes=scouted_output_indexes, extra_output_indexes=extra_output_indexes)
+            additional_strucutres = {} if args.reference is None else {'reference': (out_dir / 'reference.pdb', 'brightorange', False)}
+            pockets_writer.write_pymol_script(out_dir / 'pymol.pml', structures_script, additional_strucutres=additional_strucutres, scouted_output_indexes=scouted_output_indexes, extra_output_indexes=extra_output_indexes)
 
     finally:
         if atoms_writer:
