@@ -310,7 +310,22 @@ def write_atoms_and_pockets_and_density(args, structures: list[Path], out_dir: P
             # print(grid.shape, bbox_start + (grid_spacing * 0.5), grid_spacing)
             print(f'Number of volume points out of the grid: {nout}')
             mdgrid = Grid(grid, origin=bbox_start+(grid_spacing*0.5), delta=np.repeat(grid_spacing, 3))
-            mdgrid.export(str(out_dir / 'density.dx'))
+            mdgrid.export(str(out_dir / 'density.dx'), type='double') # type double maximizes pymol compatibility
+            try:
+                import mrcfile
+                with mrcfile.new(str(out_dir / 'density.mrc'), overwrite=True) as mrc:
+                    # Set data and header attributes
+                    mrc.set_data(grid.T)
+                    # Set the grid spacing along the 3 axes
+                    mrc.voxel_size = grid_spacing
+                    # Set the origin of the grid
+                    mrc.header['origin']['x'] = bbox_start[0] + grid_spacing * 0.5
+                    mrc.header['origin']['y'] = bbox_start[1] + grid_spacing * 0.5
+                    mrc.header['origin']['z'] = bbox_start[2] + grid_spacing * 0.5
+                    mrc.update_header_from_data()
+                    mrc.update_header_stats()
+            except:
+                print('Could not save density map in mrc format. Only dx format was saved.')
 
         if args.pymol:
             if args.extract or args.sort or args.align:
