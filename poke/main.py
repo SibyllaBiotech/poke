@@ -14,6 +14,8 @@ from poke import Poke, Pocket
 from poke.filter import PocketEvaluator
 from poke.writer import PocketWriter
 
+from .algorithms import add_pocket_to_density
+
 from MDAnalysis import Universe, AtomGroup, Writer
 from MDAnalysis.analysis.align import rotation_matrix
 from rich import progress
@@ -40,6 +42,8 @@ def main():
                         'compute the descriptors and save them in a csv file.')
     parser.add_argument('-v', '--volumes', action='store_true', default=False, help=
                         'save the volumes and save them in a multi-model PDB file.')
+    parser.add_argument('-dx', '--density', action='store_true', default=False, help=
+                        'save the density map of the pockets in a dx file.')
     parser.add_argument('-ss', '--selection-scouter', type=str, metavar='', default='all', help=
                         'selection of atoms used by the scouter.')
     parser.add_argument('-so', '--selection-output', type=str, metavar='', default='all', help=
@@ -172,8 +176,11 @@ def run(out_dir: Path, structures: list[Path], args: argparse.Namespace):
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Write atoms anv volumes
-    if args.extract or args.sort or args.volumes:
+    if (args.extract or args.sort or args.volumes) and not args.density:
         write_atoms_and_pockets(args, structures, out_dir, atoms_output, frames, pockets, scouted_output_indexes, extra_output_indexes)
+
+    if (args.extract or args.sort or args.volumes) and args.density:
+        write_atoms_and_pockets_and_density(args, structures, out_dir, atoms_output, frames, pockets, scouted_output_indexes, extra_output_indexes)
 
     if args.descriptors:
         write_desciptors(out_dir, atoms_scouter, pockets, frames)
@@ -219,6 +226,88 @@ def split_structures(structures: list[Path]):
 
     if output_list:
         yield output_list
+
+def write_atoms_and_pockets_and_density(args, structures: list[Path], out_dir: Path, atoms: AtomGroup, frames: list[int], pockets: list[list[Pocket]], scouted_output_indexes: list[int], extra_output_indexes: list[int]):
+
+    try: 
+        from gridData import Grid 
+    except ImportError:
+        raise UserError('The gridData package is required to compute the density map. Install it with "pip install gridDataFormats"')
+    
+    if args.density:
+        grid_margin = 5.
+        grid_spacing = 1.
+        reference = Universe(structures[0])
+        bbox = reference.atoms.bbox()
+        bbox = np.array([[x-grid_margin for x in bbox[0]], [x+grid_margin for x in bbox[1]]], dtype=np.float32)
+        bbox_start = bbox[0] - grid_margin
+        shape = np.ceil((bbox[1] - bbox[0]) / grid_spacing).astype(np.int32)
+        grid = np.zeros(shape, dtype=np.float32)
+
+    if args.align is not None:
+        aligner = Aligner(reference.select_atoms(args.align))
+
+    try:
+        atoms_writer = None
+        pockets_writer = None
+
+        if args.extract or args.sort:
+            atoms_writer = Writer(str(out_dir / 'frames.xtc'), multiframe=True)
+            ts = atoms.universe.trajectory[0]
+
+            if args.align:
+                atoms.positions = aligner.compute(ts.positions).apply(atoms.positions)
+
+            atoms.write(str(out_dir / 'structure.pdb'))
+        
+        if args.volumes:
+            pockets_writer = PocketWriter(open_stream(out_dir / 'volumes.pdb', 'wt', args.compress), resid_start=resid_start)
+
+        for frame, pks in zip(frames, pockets):
+            ts = atoms.universe.trajectory[frame]
+
+            if args.align:
+                aligner.compute(ts.positions)
+                
+            if atoms_writer:
+                if args.align:
+                    atoms.positions = aligner.apply(atoms.positions)
+                atoms_writer.write(atoms)
+
+            if pockets_writer or args.density:
+                if args.align:
+                    for p in pks:
+                        p.translate(-aligner.positions_cog)
+                        p.apply_matrix(aligner.rotation)
+                        p.translate(aligner.reference_cog)
+                if pockets_writer:
+                    pockets_writer.write_frame(pks)
+                if args.density:
+                    nout = 0
+                    for p in pks:
+                        vp = p.volume_positions
+                        add_pocket_to_density(grid, vp, bbox_start, grid_spacing, nout)
+        
+        if args.density:
+            # print(grid.shape, bbox_start + (grid_spacing * 0.5), grid_spacing)
+            print(f'Number of volume points out of the grid: {nout}')
+            mdgrid = Grid(grid, origin=bbox_start+(grid_spacing*0.5), delta=np.repeat(grid_spacing, 3))
+            mdgrid.export(str(out_dir / 'density.dx'))
+
+        if args.pymol and pockets_writer:
+            if args.extract or args.sort:
+                structures_script = [out_dir / 'structure.pdb', out_dir / 'frames.xtc']
+            else:
+                structures_script = structures
+
+            pockets_writer.write_pymol_script(out_dir / 'pymol.pml', structures_script, scouted_output_indexes=scouted_output_indexes, extra_output_indexes=extra_output_indexes)
+
+    finally:
+        if atoms_writer:
+            atoms_writer.close()
+        if pockets_writer:
+            pockets_writer.output.close()
+
 
 def write_atoms_and_pockets(args, structures: list[Path], out_dir: Path, atoms: AtomGroup, frames: list[int], pockets: list[list[Pocket]], scouted_output_indexes: list[int], extra_output_indexes: list[int]):
     

@@ -626,3 +626,20 @@ def compute_descriptors(origin: np.ndarray, group: list[tuple], energy_map: np.n
 
     # Return the descriptors
     return origin.copy(), volume_points, surface_points, regions, np.array(sorted(atoms)), enclosure, lengths, energy, electro
+
+@nb.njit(cache=True, fastmath=True)
+def add_pocket_to_density(grid: np.ndarray, vp: np.ndarray, grid_origin: np.ndarray, grid_spacing: float, nout: int):
+    '''
+        This function adds the volume points of a pocket to a density grid.
+    '''
+    nx, ny, nz = grid.shape
+    for i in range(vp.shape[0]):
+        # convert vp coordinates to grid points:
+        vpidx_x = np.int32((vp[i,0] - grid_origin[0]) // grid_spacing)
+        vpidx_y = np.int32((vp[i,1] - grid_origin[1]) // grid_spacing)
+        vpidx_z = np.int32((vp[i,2] - grid_origin[2]) // grid_spacing)
+        # check if the point is inside the grid
+        if 0 <= vpidx_x< nx and 0 <= vpidx_y < ny and 0 <= vpidx_z < nz:
+            grid[vpidx_x, vpidx_y, vpidx_z] += 1
+        else:
+            nout += 1
