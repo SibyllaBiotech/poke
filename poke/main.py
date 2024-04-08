@@ -188,7 +188,7 @@ def run(out_dir: Path, structures: list[Path], args: argparse.Namespace):
     
     if args.launch_script:
         with open_stream(out_dir / 'launch.sh', 'wt', compressed=False) as stream:
-            for env_variable in ['POKE_FONT', 'POKE_FIGSIZE', 'POKE_COLOR']:
+            for env_variable in ['POKE_FONT', 'POKE_FIGSIZE', 'POKE_COLOR', 'POKE_QUANTILES']:
                 if env_variable in os.environ:
                     stream.write(f'export {env_variable}="{os.environ[env_variable]}"\n')
             stream.write('poke ' + shlex.join(sys.argv[1:]) + '\n')
@@ -343,7 +343,8 @@ def plot_desciptors(out_dir, pockets: list[Pocket]):
     if 'POKE_FIGSIZE' in os.environ:
         plt.rcParams['figure.figsize'] = tuple(float(s.strip()) for s in os.environ['POKE_FIGSIZE'].split(','))
 
-    color = os.environ['POKE_COLOR'] if 'POKE_COLOR' in os.environ else None
+    color = os.environ.get('POKE_COLOR', None)
+    do_quantiles = os.environ.get('POKE_QUANTILES', 'yes').lower() not in ('no', 'false', '0')    
         
     (out_dir / 'histograms').mkdir(parents=True, exist_ok=True)
 
@@ -351,7 +352,6 @@ def plot_desciptors(out_dir, pockets: list[Pocket]):
     names = Pocket.properties.keys()
 
     for name, values in zip(names, descriptors.T):
-        q25, q50, q75 = np.quantile(values, [0.25, 0.5, 0.75])
         fig, ax = plt.subplots()
         kwargs = Pocket.properties[name][1]
         # If an arg is a callable, call it passing values
@@ -362,12 +362,14 @@ def plot_desciptors(out_dir, pockets: list[Pocket]):
         kwargs.setdefault('bins', 'auto')
         
         ax.hist(values, **kwargs)
-        ax.axvline(q25, color='black', ls='--', label=f'Q25: {q25:.2g}')
-        ax.axvline(q50, color='black', ls='-', label=f'Q50: {q50:.2g}')
-        ax.axvline(q75, color='black', ls='--', label=f'Q75: {q75:.2g}')
+        if do_quantiles:
+            q25, q50, q75 = np.quantile(values, [0.25, 0.5, 0.75])
+            ax.axvline(q25, color='black', ls='--', label=f'Q25: {q25:.2g}')
+            ax.axvline(q50, color='black', ls='-', label=f'Q50: {q50:.2g}')
+            ax.axvline(q75, color='black', ls='--', label=f'Q75: {q75:.2g}')
+            ax.legend()
         ax.set_xlabel(name)
         ax.set_ylabel('Counts')
-        ax.legend()
         fig.tight_layout()
         fig.savefig(out_dir / 'histograms' / f'{name}.png', dpi=300)
         plt.close(fig)
