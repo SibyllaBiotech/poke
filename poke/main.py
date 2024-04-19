@@ -237,6 +237,7 @@ def write_atoms_and_pockets_and_density(args, structures: list[Path], out_dir: P
     if args.reference is not None:
         reference = Universe(args.reference)
     else:
+        atoms.universe.trajectory[0]
         reference = atoms.universe
 
     if args.density:
@@ -307,7 +308,9 @@ def write_atoms_and_pockets_and_density(args, structures: list[Path], out_dir: P
                         add_pocket_to_density(grid, vp, bbox_start, grid_spacing, nout)
         
         if args.density:
-            # print(grid.shape, bbox_start + (grid_spacing * 0.5), grid_spacing)
+            print(f'Maximum density value: {grid.max()}')
+            # print(f'Minimum density value: {grid.min()}')
+            # print(f'Minimum density value different from zero: {grid[grid != 0].min()}')
             print(f'Number of volume points out of the grid: {nout}')
             mdgrid = Grid(grid, origin=bbox_start+(grid_spacing*0.5), delta=np.repeat(grid_spacing, 3))
             mdgrid.export(str(out_dir / 'density.dx'), type='double') # type double maximizes pymol compatibility
@@ -347,6 +350,8 @@ def write_atoms_and_pockets(args, structures: list[Path], out_dir: Path, atoms: 
     if args.reference is not None:
         reference = Universe(args.reference)
     else:
+        # rewind traj:
+        atoms.universe.trajectory[0]
         reference = atoms.universe
     
     if args.align is not None:
