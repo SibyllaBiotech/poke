@@ -693,6 +693,7 @@ def add_pocket_to_density(grid: np.ndarray, vp: np.ndarray, grid_origin: np.ndar
         This function adds the volume points of a pocket to a density grid.
     '''
     nx, ny, nz = grid.shape
+    grid_flags = np.zeros((nx,ny,nz), dtype=np.bool_)
     for i in range(vp.shape[0]):
         # convert vp coordinates to grid points:
         vpidx_x = np.int32((vp[i,0] - grid_origin[0]) // grid_spacing)
@@ -700,6 +701,8 @@ def add_pocket_to_density(grid: np.ndarray, vp: np.ndarray, grid_origin: np.ndar
         vpidx_z = np.int32((vp[i,2] - grid_origin[2]) // grid_spacing)
         # check if the point is inside the grid
         if 0 <= vpidx_x< nx and 0 <= vpidx_y < ny and 0 <= vpidx_z < nz:
-            grid[vpidx_x, vpidx_y, vpidx_z] += 1
+            if grid_flags[vpidx_x, vpidx_y, vpidx_z] == 0:
+                grid[vpidx_x, vpidx_y, vpidx_z] += 1
+                grid_flags[vpidx_x, vpidx_y, vpidx_z] = True
         else:
             nout += 1

@@ -249,7 +249,7 @@ def write_atoms_and_pockets_and_density(args, structures: list[Path], out_dir: P
         grid_spacing = 1.
         bbox = reference.atoms.bbox()
         bbox = np.array([[x-grid_margin for x in bbox[0]], [x+grid_margin for x in bbox[1]]], dtype=np.float32)
-        bbox_start = bbox[0] - grid_margin
+        bbox_start = bbox[0] # - grid_margin
         shape = np.ceil((bbox[1] - bbox[0]) / grid_spacing).astype(np.int32)
         grid = np.zeros(shape, dtype=np.float32)
 
