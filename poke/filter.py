@@ -1,12 +1,16 @@
 from functools import cached_property
+import numpy as np
+from typing import Literal
 
 from .pocket import Pocket
+from .utils import Aligner
 from MDAnalysis import AtomGroup
 
 class PocketEvaluator:
-    def __init__(self, pocket: Pocket, atoms: AtomGroup):
+    def __init__(self, pocket: Pocket, atoms: AtomGroup, reference: AtomGroup):
         self.pocket = pocket
         self.atoms = atoms
+        self.reference = reference
 
     def __hasitem__(self, key: str):
         return False
@@ -17,7 +21,7 @@ class PocketEvaluator:
                 return getattr(self, key)
             except AttributeError:
                 return getattr(self.pocket, key)
-        except:
+        except AttributeError:
             raise KeyError(key)
 
     @cached_property
@@ -35,6 +39,26 @@ class PocketEvaluator:
         diff2 = len(residues) - intersection
         return intersection / (intersection + a*diff1 + b*diff2)
 
+    # @cached_property
+    def rmsd(self, selection: Literal["all", "CA"]="all"):
+        if selection == "all":
+            atom_ix = self.pocket.atoms
+
+        elif selection == "CA":
+            atom_to_res = self.reference.resids 
+            atom_to_res -= atom_to_res.min()
+
+            p_resix = np.unique(atom_to_res[self.pocket.atoms])
+            atom_ix = self.atoms.residues[p_resix].atoms.select_atoms("name CA").ix
+
+        else:
+            raise ValueError(f'Invalid selection for rmsd calculation: {selection}')
+            
+        aligner = Aligner(self.reference.positions[atom_ix], atom_ix)
+        rms = aligner.compute(self.atoms.positions).rmsd
+        
+        return rms
+
 
     def residues(self, *resids: list[int], min_common=None, max_extra=None):
         list_resids = set(resids)
@@ -48,7 +72,7 @@ class PocketEvaluator:
             (max_extra is None or n_extra <= max_extra)
         )
 
-    def evaluate(expr, pocket, atoms):
-        return eval(expr, globals(), PocketEvaluator(pocket, atoms))
+    def evaluate(expr, pocket, atoms, reference):
+        return eval(expr, globals(), PocketEvaluator(pocket, atoms, reference))
     
 

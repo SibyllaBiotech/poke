@@ -1,6 +1,29 @@
 import numpy as np
 import numba as nb
 
+from MDAnalysis.analysis.align import rotation_matrix
+
+class Aligner:
+
+    def __init__(self, reference: np.ndarray, indexes: np.ndarray) -> None:
+        self.indexes   = indexes
+        self.reference = reference
+
+        self.reference_cog = np.mean(self.reference, axis=0)
+        self.reference -= self.reference_cog
+
+    def compute(self, positions: np.ndarray):
+        positions = positions[self.indexes]
+        self.positions_cog = np.mean(positions, axis=0)
+        self.rotation, self.rmsd = rotation_matrix(positions - self.positions_cog, self.reference)
+        return self
+        
+    def apply(self, positions: np.ndarray):
+        return np.dot(positions - self.positions_cog, self.rotation.T) + self.reference_cog
+    
+    def __call__(self, positions: np.ndarray):
+        return self.compute(positions).apply(positions)
+
 @nb.njit(cache=True, fastmath=True, nogil=True)
 def compute_box(array: np.ndarray):
     '''

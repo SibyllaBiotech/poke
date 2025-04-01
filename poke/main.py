@@ -16,8 +16,8 @@ from poke.writer import PocketWriter
 
 from .algorithms import add_pocket_to_density
 
-from MDAnalysis import Universe, AtomGroup, Writer
-from MDAnalysis.analysis.align import rotation_matrix
+from MDAnalysis import Universe, AtomGroup, Writer, Merge
+from .utils import Aligner
 from rich import progress
 from rich.text import Text
 
@@ -120,6 +120,15 @@ def run(out_dir: Path, structures: list[Path], args: argparse.Namespace):
     scouted_output_indexes = np.where(scouted_output_mask)[0]
     extra_output_indexes = np.where(~scouted_output_mask)[0]
 
+    # Initialize copy of atom scouter and reference (needed for rmsd filtering)
+    atoms_scouter_copy = atoms_scouter.universe.copy().atoms
+
+    if args.reference is not None:
+        reference = Universe(args.reference).atoms
+    else:
+        u.trajectory[0]
+        reference = u.copy().atoms
+
     # Initialize the scouter with the atoms 
     scouter = Poke.from_mdanalysis(atoms_scouter, scoring_model=args.scoring_function)
 
@@ -143,11 +152,11 @@ def run(out_dir: Path, structures: list[Path], args: argparse.Namespace):
     
         with Pool(scouter=scouter, n_frames=u.trajectory.n_frames, n_cores=args.ncores) as pool: 
             for i, frame_pockets in enumerate(pool.get_pockets(atoms_scouter.positions for _ in u.trajectory)):
+                atoms_scouter_copy.universe.trajectory[i]
                 n_pockets += len(frame_pockets)
-
                 # Apply a filter to the pockets evaluating the args.filter on each pocket
                 if args.filter is not None:
-                    frame_pockets = [p for p in frame_pockets if PocketEvaluator.evaluate(args.filter, p, atoms_scouter)]
+                    frame_pockets = [p for p in frame_pockets if PocketEvaluator.evaluate(args.filter, p, atoms_scouter_copy, reference)]
                 n_kept_pockets += len(frame_pockets)
 
                 # If sorting is active only the trajectory will be written with only one pocket per frame
@@ -165,10 +174,13 @@ def run(out_dir: Path, structures: list[Path], args: argparse.Namespace):
                     progress_bar.update(task, advance=pool.chunksize, n_kept_pockets=n_kept_pockets, n_pockets=n_pockets)
         
         progress_bar.update(task, completed=u.trajectory.n_frames, n_kept_pockets=n_kept_pockets, n_pockets=n_pockets)
+    
+    # print(f'Frames with pockets found: {len(frames)}')
+    # print(f'Pockets found: {sum(len(pks) for pks in pockets)}')
 
     # Sort the pockets
     if args.sort and frames and pockets:
-        frames, pockets = zip(*sorted(zip(frames, pockets), key=lambda fp: PocketEvaluator.evaluate(args.sort, fp[1][0], atoms_scouter), reverse=True))
+        frames, pockets = zip(*sorted(zip(frames, pockets), key=lambda fp: PocketEvaluator.evaluate(args.sort, fp[1][0], atoms_scouter, reference), reverse=True))
 
     if args.max_output_frames is not None:
         frames = frames[:args.max_output_frames]
@@ -179,10 +191,10 @@ def run(out_dir: Path, structures: list[Path], args: argparse.Namespace):
 
     # Write atoms anv volumes
     if (args.extract or args.sort or args.volumes) and not args.density:
-        write_atoms_and_pockets(args, structures, out_dir, atoms_output, frames, pockets, scouted_output_indexes, extra_output_indexes)
+        write_atoms_and_pockets(args, structures, out_dir, atoms_output, frames, pockets, scouted_output_indexes, extra_output_indexes, reference)
 
     if (args.extract or args.sort or args.volumes) and args.density:
-        write_atoms_and_pockets_and_density(args, structures, out_dir, atoms_output, frames, pockets, scouted_output_indexes, extra_output_indexes)
+        write_atoms_and_pockets_and_density(args, structures, out_dir, atoms_output, frames, pockets, scouted_output_indexes, extra_output_indexes, reference)
 
     if args.descriptors:
         write_desciptors(out_dir, atoms_scouter, pockets, frames)
@@ -232,13 +244,7 @@ def split_structures(structures: list[Path]):
     if output_list:
         yield output_list
 
-def write_atoms_and_pockets_and_density(args, structures: list[Path], out_dir: Path, atoms: AtomGroup, frames: list[int], pockets: list[list[Pocket]], scouted_output_indexes: list[int], extra_output_indexes: list[int]):
-
-    if args.reference is not None:
-        reference = Universe(args.reference)
-    else:
-        atoms.universe.trajectory[0]
-        reference = atoms.universe
+def write_atoms_and_pockets_and_density(args, structures: list[Path], out_dir: Path, atoms: AtomGroup, frames: list[int], pockets: list[list[Pocket]], scouted_output_indexes: list[int], extra_output_indexes: list[int], reference: AtomGroup):
 
     if args.density:
         try: 
@@ -345,14 +351,7 @@ def write_atoms_and_pockets_and_density(args, structures: list[Path], out_dir: P
             pockets_writer.output.close()
 
 
-def write_atoms_and_pockets(args, structures: list[Path], out_dir: Path, atoms: AtomGroup, frames: list[int], pockets: list[list[Pocket]], scouted_output_indexes: list[int], extra_output_indexes: list[int]):
-    
-    if args.reference is not None:
-        reference = Universe(args.reference)
-    else:
-        # rewind traj:
-        atoms.universe.trajectory[0]
-        reference = atoms.universe
+def write_atoms_and_pockets(args, structures: list[Path], out_dir: Path, atoms: AtomGroup, frames: list[int], pockets: list[list[Pocket]], scouted_output_indexes: list[int], extra_output_indexes: list[int], reference: AtomGroup):
     
     if args.align is not None:
         reference_pos = reference.select_atoms(args.align).positions
@@ -523,27 +522,6 @@ class PocketsFoundColumn(progress.ProgressColumn):
         if n_filtered > 0:
             text += Text(f" {n_filtered} discarted", style="cyan")
         return text
-
-class Aligner:
-
-    def __init__(self, reference: np.ndarray, indexes: np.ndarray) -> None:
-        self.indexes   = indexes
-        self.reference = reference
-
-        self.reference_cog = np.mean(self.reference, axis=0)
-        self.reference -= self.reference_cog
-
-    def compute(self, positions: np.ndarray):
-        positions = positions[self.indexes]
-        self.positions_cog = np.mean(positions, axis=0)
-        self.rotation, _ = rotation_matrix(positions - self.positions_cog, self.reference)
-        return self
-        
-    def apply(self, positions: np.ndarray):
-        return np.dot(positions - self.positions_cog, self.rotation.T) + self.reference_cog
-    
-    def __call__(self, positions: np.ndarray):
-        return self.compute(positions).apply(positions)
 
 
 class Pool:
