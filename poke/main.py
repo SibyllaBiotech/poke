@@ -24,7 +24,7 @@ from rich.text import Text
 warnings.filterwarnings('ignore', category=UserWarning, module='MDAnalysis')
 
 structure_suffixes = ('.pdb', '.gro', '.pdbqt')
-trajectory_suffixes = ('.xtc', '.trr')
+trajectory_suffixes = ('.xtc', '.trr', '.dcd')
 list_suffixes = ('.txt',)
 resid_start = 800
 
