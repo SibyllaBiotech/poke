@@ -208,7 +208,7 @@ def enhance_volumes(energy_map: np.ndarray, isovalue: float,
     i_region: int = 0
 
     # List of tuples of the form (region_id, volume_points, surface_points, box, (atoms, net_vector, net_count))
-    regions: list[tuple[int, np.ndarray, np.ndarray, np.ndarray, tuple[set[int], np.ndarray, int]], np.ndarray] = nb.typed.List()
+    regions: list[tuple[int, np.ndarray, np.ndarray, np.ndarray, tuple[set[int], np.ndarray, int], np.ndarray]] = nb.typed.List()
     # The regions are separated by the pockets_slicer and surfaces_slicer arrays
     # which contain the indices of the first point of each region
     for i in range(n_pockets):

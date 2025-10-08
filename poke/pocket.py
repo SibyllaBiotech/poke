@@ -8,7 +8,7 @@ class Pocket:
         present.              
     '''
     def __init__(self, origin: np.ndarray, spacing: np.ndarray, 
-                 volume_points: np.ndarray, surface_points: np.ndarray, accessible_points: float, 
+                 volume_points: np.ndarray, surface_points: np.ndarray, accessible_points: np.ndarray, 
                  regions: set[int], energy: np.ndarray, electro: np.ndarray,
                  atoms: np.ndarray, charges: np.ndarray, lengths: np.ndarray, enclosure: float) -> None:
         '''
