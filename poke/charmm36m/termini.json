@@ -1,0 +1,210 @@
+{
+	"3TER": {
+		"default": {
+			"delete": [],
+			"add": [
+				{
+					"type": 2,
+					"names": ["H3T"],
+					"anchors": ["O3'", "C3'", "C2'"],
+					"resindex": [0, 0, 0]
+				}
+			]
+		}
+	},
+	"5MET": {
+		"default": {
+			"delete": ["O5T", "P", "O1P", "H5T", "H5T2", "H5T1", "O2P", "C5T", "H5T3", "O5'"],
+			"add": [
+				{
+					"type": 5,
+					"names": ["H53'"],
+					"anchors": ["C5'", "C4'", "H5'", "H5''"],
+					"resindex": [0, 0, 0, 0]
+				}
+			]
+		}
+	},
+	"5PHO": {
+		"default": {
+			"delete": ["H53'", "H5T2", "H5T1", "C5T", "H5T3"],
+			"add": [
+				{
+					"type": 5,
+					"names": ["O5T"],
+					"anchors": ["P", "O1P", "O2P", "O5'"],
+					"resindex": [0, 0, 0, 0]
+				},
+				{
+					"type": 2,
+					"names": ["H5T"],
+					"anchors": ["O5T", "P", "O1P"],
+					"resindex": [0, 0, 0]
+				}
+			]
+		}
+	},
+	"5POM": {
+		"default": {
+			"delete": ["H53'", "H5T"],
+			"add": [
+				{
+					"type": 5,
+					"names": ["O5T"],
+					"anchors": ["P", "O1P", "O2P", "O5'"],
+					"resindex": [0, 0, 0, 0]
+				},
+				{
+					"type": 2,
+					"names": ["C5T"],
+					"anchors": ["O5T", "P", "O1P"],
+					"resindex": [0, 0, 0]
+				},
+				{
+					"type": 4,
+					"names": ["H5T1", "H5T2", "H5T3"],
+					"anchors": ["C5T", "O5T", "P"],
+					"resindex": [0, 0, 0]
+				}
+			]
+		}
+	},
+	"5TER": {
+		"default": {
+			"delete": ["H53'", "O5T", "P", "O1P", "H5T2", "O2P", "H5T1", "C5T", "H5T3"],
+			"add": [
+				{
+					"type": 2,
+					"names": ["H5T"],
+					"anchors": ["O5'", "C5'", "C4'"],
+					"resindex": [0, 0, 0]
+				}
+			]
+		}
+	},
+	"COO-": {
+		"default": {
+			"delete": ["CT", "HT3", "NT", "OXT", "HT2", "O", "HT1"],
+			"add": [
+				{
+					"type": 8,
+					"names": ["OT1", "OT2"],
+					"anchors": ["C", "CA", "N"],
+					"resindex": [0, 0, 0]
+				}
+			]
+		}
+	},
+	"COOH": {
+		"default": {
+			"delete": ["CT", "HT3", "NT", "OXT", "O", "HT1"],
+			"add": [
+				{
+					"type": 9,
+					"names": ["OT1", "OT2", "HT2"],
+					"anchors": ["C", "CA", "N"],
+					"resindex": [0, 0, 0]
+				}
+			]
+		}
+	},
+	"CT1": {
+		"default": {
+			"delete": ["OXT", "NT", "O"],
+			"add": [
+				{
+					"type": 9,
+					"names": ["OT1", "OT2", "CT"],
+					"anchors": ["C", "CA", "CB"],
+					"resindex": [0, 0, 0]
+				},
+				{
+					"type": 4,
+					"names": ["HT1", "HT2", "HT3"],
+					"anchors": ["CT", "OT2", "C"],
+					"resindex": [0, 0, 0]
+				}
+			]
+		}
+	},
+	"CT2": {
+		"default": {
+			"delete": ["CT", "HT3", "OT2", "OT1", "OXT"],
+			"add": [
+				{
+					"type": 1,
+					"names": ["NT"],
+					"anchors": ["C", "CA", "O"],
+					"resindex": [0, 0, 0]
+				},
+				{
+					"type": 3,
+					"names": ["HT1", "HT2"],
+					"anchors": ["NT", "C", "CA"],
+					"resindex": [0, 0, 0]
+				}
+			]
+		}
+	},
+	"NH2": {
+		"GLY": {
+			"delete": ["HN2", "HN", "H3", "H2", "HN1", "H1"],
+			"add": [
+				{
+					"type": 4,
+					"names": ["HT1", "HT2"],
+					"anchors": ["N", "CA", "C"],
+					"resindex": [0, 0, 0]
+				}
+			]
+		},
+		"default": {
+			"delete": ["HN2", "HN", "H3", "HT2", "HN1", "HT1"],
+			"add": [
+				{
+					"type": 4,
+					"names": ["H1", "H2"],
+					"anchors": ["N", "CA", "C"],
+					"resindex": [0, 0, 0]
+				}
+			]
+		}
+	},
+	"NH2+": {
+		"PRO": {
+			"delete": ["H3", "H2", "HT2", "H1", "HT1"],
+			"add": [
+				{
+					"type": 6,
+					"names": ["HN1", "HN2"],
+					"anchors": ["N", "CA", "CD"],
+					"resindex": [0, 0, 0]
+				}
+			]
+		}
+	},
+	"NH3+": {
+		"default": {
+			"delete": ["HN2", "HN", "HT2", "HN1", "HT1"],
+			"add": [
+				{
+					"type": 4,
+					"names": ["H1", "H2", "H3"],
+					"anchors": ["N", "CA", "C"],
+					"resindex": [0, 0, 0]
+				}
+			]
+		},
+		"PRO": {
+			"delete": ["H3", "H2", "HT2", "H1", "HT1"],
+			"add": [
+				{
+					"type": 6,
+					"names": ["HN1", "HN2"],
+					"anchors": ["N", "CA", "CD"],
+					"resindex": [0, 0, 0]
+				}
+			]
+		}
+	}
+}
