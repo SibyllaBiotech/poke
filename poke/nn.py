@@ -3,10 +3,15 @@ import numpy as np
 class Linear:
     def __init__(self, module) -> None:
         self.weight = module.weight.detach().numpy()
-        self.bias = module.bias.detach().numpy()
+        self.bias = module.bias.detach().numpy() if module.bias is not None else None
 
     def __call__(self, x):
-        return x @ self.weight.T + self.bias
+        x = x @ self.weight.T
+        
+        if self.bias is not None:
+            x += self.bias
+
+        return x
 
     def __repr__(self) -> str:
         return f'Linear({self.weight.shape[1]}, {self.weight.shape[0]})'
