@@ -1,3 +1,4 @@
+import copy
 import io
 import json
 import gzip
@@ -33,10 +34,10 @@ class Scorer(nn.Module):
         n_hidden_1 = 64
 
         self.layers = nn.Sequential(
-            nn.BatchNorm1d(in_features),
-            nn.Linear(in_features, n_hidden_1),
+            nn.Linear(in_features, n_hidden_1, bias=False),
+            nn.BatchNorm1d(n_hidden_1),
             nn.Sigmoid(),
-            nn.Dropout(0.05),
+            nn.Dropout(0.1),
             nn.Linear(n_hidden_1, 1),
         )
 
@@ -46,7 +47,7 @@ class Scorer(nn.Module):
     @classmethod
     def train_with(cls, train_pockets: list[Pocket], train_scores: list[float],
                         test_pockets: list[Pocket], test_scores: list[float],   
-                        epochs: int=50, learning_rate: float=0.001, report_every: int=None):
+                        epochs: int=50, learning_rate: float=0.0005, report_every: int=None):
 
         if torch.cuda.is_available(): 
             device = torch.device("cuda:0") 
@@ -57,8 +58,6 @@ class Scorer(nn.Module):
         train_features = torch.tensor(np.array([p.features() for p in train_pockets]), dtype=torch.float32).to(device)
         train_targets = torch.tensor(train_scores, dtype=torch.float32).unsqueeze(1).to(device)
 
-        print(train_features.shape)
-
         test_features = torch.tensor(np.array([p.features() for p in test_pockets]), dtype=torch.float32).to(device)
         test_targets = torch.tensor(test_scores, dtype=torch.float32).unsqueeze(1).to(device)
 
@@ -68,6 +67,10 @@ class Scorer(nn.Module):
         optimizer = optim.Adamax(model.parameters(), lr=learning_rate)
         criterion = nn.MSELoss()
 
+        # set variables to keep track of the model that peforms best on the test set, to avoid overfitting
+        best_test_r2 = 0
+        best_model = None
+        
         consecutive_train_better = 0
 
         try:
@@ -104,15 +107,20 @@ class Scorer(nn.Module):
                     else:
                         consecutive_train_better = 0
 
+                    if test_r2 > best_test_r2:
+                        best_test_r2 = test_r2
+                        best_model = copy.deepcopy(model)
+
                     model.train()
                     print(f'Epoch {i:<4} Train Loss: {loss:.4g} Test Loss: {test_loss:.4g} Train r2: {train_r2:.4g} Test r2: {test_r2:.4g}', end='\r')
         except KeyboardInterrupt:
             print('')
             pass
 
-        return model.cpu()
+        return best_model.cpu()
 
     def predict(self, pockets: list[Pocket]):
+        self.eval()
         features = torch.tensor(np.array([p.features() for p in pockets]), dtype=torch.float32)
         return self(features).detach().numpy().ravel()
         
