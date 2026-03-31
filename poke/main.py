@@ -76,6 +76,8 @@ def main():
                         'number of cores used to parallelize the computation of trajectories or multimodel pdb files')
     parser.add_argument('-ls', '--launch-script', action='store_true', default=False, help=
                         'save lauch command in a bash script to be able to rerun with the same parameters')
+    parser.add_argument('-ks', '--keep-subpockets', action='store_true', default=False, help=
+                        'keep all pockets even if they share regions, instead of only the highest scoring one.')
     args = parser.parse_args()
 
     # Precompile filter and sort expressions
@@ -130,7 +132,7 @@ def run(out_dir: Path, structures: list[Path], args: argparse.Namespace):
         reference = u.copy().atoms
 
     # Initialize the scouter with the atoms 
-    scouter = Poke.from_mdanalysis(atoms_scouter, scoring_model=args.scoring_function)
+    scouter = Poke.from_mdanalysis(atoms_scouter, scoring_model=args.scoring_function, keep_subpockets=args.keep_subpockets)
 
     frames = []
     pockets = []

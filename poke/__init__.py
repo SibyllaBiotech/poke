@@ -15,7 +15,7 @@ class Poke:
 
     def __init__(self, charges: np.ndarray, 
                  sigmas: np.ndarray, epsilons: np.ndarray,
-                 spacing: float=0.5, cutoff: float=7.5, 
+                 spacing: float=0.5, cutoff: float=7.5, keep_subpockets: bool=False,
                  electro_force: float=1120, probe_sigma: float=3.8,
                  energy_threshold: float=-14.5, min_volume: float=15, 
                  min_spot_volume: float=2.7, max_bulk_distance: float=1.8, 
@@ -77,6 +77,7 @@ class Poke:
         self.min_spot_points = min_spot_volume * self.inverse_spacing**3
         self.max_bulk_distance = max_bulk_distance * self.inverse_spacing
         self.max_spot_distance = max_spot_distance * self.inverse_spacing
+        self.keep_subpockets = keep_subpockets
 
         # Store the atoms' properties
         self.charges = charges
@@ -190,6 +191,7 @@ class Poke:
             p.score = self.scoring_model(np.array(p.features()))[0]
 
         # Of all intersecting pockets, keep only the one with the highest score
-        pockets = [p for p in pockets if all(p.score >= q.score for q in pockets if (p.regions & q.regions))]
+        if not self.keep_subpockets:
+            pockets = [p for p in pockets if all(p.score >= q.score for q in pockets if (p.regions & q.regions))]
         
         return pockets
