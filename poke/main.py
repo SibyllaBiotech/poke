@@ -16,6 +16,9 @@ from poke.writer import PocketWriter
 
 from .algorithms import add_pocket_to_density
 
+from .preparator import Preparator, MDAUniverse
+from .parametrizer import charmm
+
 from MDAnalysis import Universe, AtomGroup, Writer, Merge
 from .utils import Aligner
 from rich import progress
@@ -44,7 +47,7 @@ def main():
                         'save the volumes and save them in a multi-model PDB file.')
     parser.add_argument('-dx', '--density', action='store_true', default=False, help=
                         'save the density map of the pockets in a dx file.')
-    parser.add_argument('-ss', '--selection-scouter', type=str, metavar='', default='all', help=
+    parser.add_argument('-ss', '--selection-scouter', type=str, metavar='', default=None, help=
                         'selection of atoms used by the scouter.')
     parser.add_argument('-so', '--selection-output', type=str, metavar='', default='all', help=
                         'selection of atoms written in the output.')
@@ -78,8 +81,55 @@ def main():
                         'save lauch command in a bash script to be able to rerun with the same parameters')
     parser.add_argument('-ks', '--keep-subpockets', action='store_true', default=False, help=
                         'keep all pockets even if they share regions, instead of only the highest scoring one.')
-    args = parser.parse_args()
-
+    
+    # Struture preparation arguments
+    preparator_parser = parser.add_argument_group('structure preparation options')
+    preparator_parser.add_argument('--skip-prepare', action='store_true', default=False, help=
+                        'skip preparation of the structures before scouting. (Select altLocs, add hydrogens and caps). '
+                        'Deafult is to prepare the structures.')
+    preparator_parser.add_argument('--keep-hydrogens', action='store_true', default=False, help=
+                        'try to keep the existing hydrogens during preparation, adding only the missing ones.')
+    preparator_parser.add_argument('--selection-prepare', type=str, metavar='SEL', default=None, help=
+                        'selection of atoms to prepare. Other atoms are kept as they are. '
+                        'If not provided, only proteins, nucleic acids, '
+                        'and common co-factors and structural ions are prepared.')
+    preparator_parser.add_argument('--caps-types', nargs='+', type=str, metavar='TYPE N_TERM C_TERM',
+                        default='protein NH3+ COO- nucleic_acid 5TER 3TER'.split(), help=
+                        'types of caps to add to the structures.')
+    preparator_parser.add_argument('--caps-exclude', nargs='*', type=str, metavar='NAME', 
+                        default='ACE NME'.split(), help=
+                        'list of residue names to exclude from capping. ')
+    preparator_parser.add_argument('--ignore-segid', action='store_true', default=False, help=
+                        'do not use the segid (chain) value to split the structure for capping.')
+    preparator_parser.add_argument('--max-other-len', type=int, metavar='LEN', default=5, help=
+                        'maximum number of residues of type "other" before a chain is considered interrupted.')
+    preparator_parser.add_argument('--resid-threshold', type=int, metavar='LEN', default=50, help=
+                        'jump in residues to consider a chain interrupted. (used only if segid info is absent).')
+    preparator_parser.add_argument('--ter-indices', type=int, nargs='*', metavar='IX', default=[], help=
+                        'explicit list of 0-based indices of residues to be considered as terminal residues ' 
+                        'for splitting.')
+    preparator_parser.add_argument('--his', type=str, metavar='TYPE', default='auto', help=
+                        'type of histidine to use. Options are "auto", "bond", "HSP", "HSE", "HSD". '
+                        'Default is "auto" which uses the presence of HD1 and HE2 or hydrogen bonding detection.')
+    preparator_parser.add_argument('--lys', type=str, metavar='TYPE', default='auto', help=
+                        'type of lysine to use. Options are "auto", "LYS", "LSN". Default is "auto".')
+    preparator_parser.add_argument('--arg', type=str, metavar='TYPE', default='auto', help=
+                        'type of arginine to use. Options are "auto", "ARG", "ARGN". Default is "auto".')
+    preparator_parser.add_argument('--glu', type=str, metavar='TYPE', default='auto', help=
+                        'type of glutamate to use. Options are "auto", "GLU", "GLUP". Default is "auto".')
+    preparator_parser.add_argument('--asp', type=str, metavar='TYPE', default='auto', help=
+                        'type of aspartate to use. Options are "auto", "ASP", "ASPP". Default is "auto".')
+    preparator_parser.add_argument('--cys', type=str, metavar='TYPE', default='auto', help=
+                        'type of cysteine to use. Options are "auto", "bond", "CYS", "CYS2". ' \
+                        'Default is "auto" wich uses the presence of HG1 or covalent bonding detection.')
+    preparator_parser.add_argument('--custom-restype', nargs='*', type=str, metavar='IX TYPE', help=
+                        'custom residue type to use at specific 0-based residues ixs.')
+        
+    args = parser.parse_args()  
+    args.caps_types = {t: (cn, cc) for t, cn, cc in zip(args.caps_types[::3], args.caps_types[1::3], args.caps_types[2::3])}
+    if args.custom_restype:
+        args.custom_restype = {int(ix): t for ix, t in zip(args.custom_restype[::2], args.custom_restype[1::2])}
+    
     # Precompile filter and sort expressions
     if args.filter:
         args.filter = compile(args.filter, __file__, 'eval')
@@ -114,8 +164,40 @@ def run(out_dir: Path, structures: list[Path], args: argparse.Namespace):
     # Print the current structures
     print(f'{" ".join(map(str, structures))} ▶ ./{out_dir}')
 
-    # Suppress the warning during the opening of the structures
-    u = Universe(*structures)
+    if args.skip_prepare:
+        u = Universe(*structures)
+        if args.selection_scouter is None:
+            args.selection_scouter = 'all'
+            
+    else:
+        u = MDAUniverse(*structures,
+                        selection=args.selection_prepare,
+                        forcefield=charmm,
+                        keep_existing=args.keep_hydrogens,
+                        strictness=Preparator.StrictLevel.NONE,
+                        caps_types=args.caps_types,
+                        max_interruption_size=args.max_other_len,
+                        on_segid=not args.ignore_segid,
+                        resid_threshold=args.resid_threshold,
+                        skip=args.caps_exclude,
+                        ter= args.ter_indices,
+                        his=args.his,
+                        lys=args.lys,
+                        arg=args.arg,
+                        glu=args.glu,
+                        asp=args.asp,
+                        cys=args.cys,
+                        specific=args.custom_restype)
+        
+        if args.selection_scouter is None:
+            args.selection_scouter = u.selection
+            print(f'\nStructure is being processed and no selection for scouting has been provided. '
+                  f'Selection "{args.selection_scouter}" will be used for scouting.\n')
+
+        # Preparation always implys extraction to write protonated structures
+        args.extract = True 
+
+    
     atoms_scouter = u.select_atoms(args.selection_scouter)
     atoms_output = u.select_atoms(args.selection_output)
     scouted_output_mask = np.isin(atoms_output.ix, atoms_scouter.ix)
