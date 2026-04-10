@@ -194,8 +194,8 @@ class MDAUniverse(Universe):
                     out_ix += n_transformed
                     transformed_res_ix += 1
             
-            out_transform_ix = np.array(out_transform_ix)
-            out_preserved_ix = np.array(out_preserved_ix)
+            out_transform_ix = np.array(out_transform_ix, dtype=int)
+            out_preserved_ix = np.array(out_preserved_ix, dtype=int)
             output_len = out_ix
     
             # Copy over attributes from the original topology, texpanding the atom attributes as needed
