@@ -84,9 +84,9 @@ def main():
     
     # Struture preparation arguments
     preparator_parser = parser.add_argument_group('structure preparation options')
-    preparator_parser.add_argument('--skip-prepare', action='store_true', default=False, help=
-                        'skip preparation of the structures before scouting. (Select altLocs, add hydrogens and caps). '
-                        'Deafult is to prepare the structures.')
+    preparator_parser.add_argument('--prepare', action='store_true', default=False, help=
+                        'prepare the structures before scouting (select altLocs, add hydrogens and caps).'
+                        'Default is to NOT prepare the structures.')
     preparator_parser.add_argument('--keep-hydrogens', action='store_true', default=False, help=
                         'try to keep the existing hydrogens during preparation, adding only the missing ones.')
     preparator_parser.add_argument('--selection-prepare', type=str, metavar='SEL', default=None, help=
@@ -164,7 +164,7 @@ def run(out_dir: Path, structures: list[Path], args: argparse.Namespace):
     # Print the current structures
     print(f'{" ".join(map(str, structures))} ▶ ./{out_dir}')
 
-    if args.skip_prepare:
+    if not args.prepare:
         u = Universe(*structures)
         if args.selection_scouter is None:
             args.selection_scouter = 'all'
