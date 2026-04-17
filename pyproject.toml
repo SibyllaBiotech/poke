@@ -12,7 +12,7 @@ dynamic = ["version"]
 dependencies = [
     "numpy",
     "numba",
-    "mdanalysis",
+    "mdanalysis>=2.8",
     "rich"
 ]
 

@@ -5,7 +5,6 @@ from MDAnalysis import Universe
 from MDAnalysis.core.topology import Topology
 from MDAnalysis.core.topologyattrs import AtomAttr
 from MDAnalysis.coordinates.base import ProtoReader
-from MDAnalysis.topology.guessers import guess_types, guess_masses
 
 from . import Preparator
 
@@ -113,13 +112,6 @@ class MDAUniverse(Universe):
     Coordinates are transformed on-the-fly when reading trajectory frames.
     """
 
-    # Deafults to populate the attributes of new atoms created by the Preparator
-    _attr_default = {
-        'elements': guess_types,
-        'types': guess_types,
-        'masses': lambda names: guess_masses(guess_types(names)),
-    }
-
     def __init__(
         self, 
         topology=None, 
@@ -203,6 +195,13 @@ class MDAUniverse(Universe):
             conn_attrs = set(['bonds', 'angles', 'dihedrals', 'impropers']) # skip connectivity attributes for now
             curr_attrs = set(dir(original_universe._topology))
 
+            # Deafults to populate the attributes of new atoms created by the Preparator
+            _attr_default = {
+                'elements': original_universe._context.guess_types,
+                'types': original_universe._context.guess_types,
+                'masses': lambda names: original_universe._context.guess_masses(original_universe._context.guess_types(names)),
+            }
+
             attrs = []
             for attr_name in curr_attrs - base_attrs - conn_attrs:
                 attribute = getattr(original_universe._topology, attr_name)
@@ -216,7 +215,7 @@ class MDAUniverse(Universe):
                         # If a default function is provided for this attribute, use it to populate new values
                         # Otherwise, pass None to fill with value of previous original atom
                         new_values[out_transform_ix] = preparator.reshape(
-                            attribute.values[input_transform_ix], fill_value=self._attr_default.get(attr_name, None)
+                            attribute.values[input_transform_ix], fill_value=_attr_default.get(attr_name, None)
                         )
                     attribute = attr_type(new_values)
                 attrs.append(attribute)
