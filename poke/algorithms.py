@@ -676,7 +676,9 @@ def compute_descriptors(origin: np.ndarray, group: list[tuple], energy_map: np.n
     enclosure = np.exp(-0.3 * net_norm**2)
 
     # Compute three orthogonal lengths of the pocket diagonalizing the autocorrelation matrix
-    residuals = surface_points - average_3d(surface_points)
+    # Transform surface points indices from int16 to float32 to avoid numerical issues
+    surface_points_f = surface_points.astype(np.float32)
+    residuals = surface_points_f - average_3d(surface_points_f)
     variances = np.linalg.eigvalsh(np.dot(residuals.T, residuals)) / residuals.shape[0]
     lengths = np.sqrt(variances)[::-1]
 
