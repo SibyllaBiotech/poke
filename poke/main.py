@@ -43,6 +43,8 @@ def main():
                         'output path where to create the folders with the results.')
     parser.add_argument('-d', '--descriptors', action='store_true', default=False, help=
                         'compute the descriptors and save them in a csv file.')
+    parser.add_argument('--write-atoms', action='store_true', default=False, help=
+                        'add the pocket atoms to the output descriptors csv file (Note: requires -d flag)')
     parser.add_argument('-v', '--volumes', action='store_true', default=False, help=
                         'save the volumes and save them in a multi-model PDB file.')
     parser.add_argument('-dx', '--density', action='store_true', default=False, help=
@@ -281,13 +283,13 @@ def run(out_dir: Path, structures: list[Path], args: argparse.Namespace):
         write_atoms_and_pockets_and_density(args, structures, out_dir, atoms_output, frames, pockets, scouted_output_indexes, extra_output_indexes, reference)
 
     if args.descriptors:
-        write_desciptors(out_dir, atoms_scouter, pockets, frames)
+        write_descriptors(out_dir, atoms_scouter, pockets, frames, write_atoms=args.write_atoms)
 
     if args.pickle:
         write_pickle(args, out_dir, pockets)
 
     if args.graph:
-        plot_desciptors(out_dir, pockets)
+        plot_descriptors(out_dir, pockets)
     
     if args.launch_script:
         with open_stream(out_dir / 'launch.sh', 'wt', compressed=False) as stream:
@@ -501,7 +503,7 @@ def write_atoms_and_pockets(args, structures: list[Path], out_dir: Path, atoms: 
         if pockets_writer:
             pockets_writer.output.close()
 
-def write_desciptors(out_dir, atoms: AtomGroup, pockets: list[Pocket], frames: list[int]):
+def write_descriptors(out_dir, atoms: AtomGroup, pockets: list[Pocket], frames: list[int], write_atoms=False):
     '''
         Write a csv with the descriptors for each pocket in the list.
     '''
@@ -514,27 +516,40 @@ def write_desciptors(out_dir, atoms: AtomGroup, pockets: list[Pocket], frames: l
                 props = p.props()
                 
                 if not header_written:
-                    writer.writerow((
+                    header = [ 
                         'OutputFrame', 
                         'OriginalFrame', 
                         'PocketResid', 
                         *props.keys() ,
-                        'Residues', 
-                        'Atoms'
-                    ))
+                        'Residues'
+                    ]
                     
+                    if write_atoms:
+                        header.append('Atoms')
+
+                    writer.writerow(header)
                     header_written = True
 
-                writer.writerow((
-                    frame, 
-                    frames[frame], 
-                    id,  
-                    *(f'{v:.2g}' for v in props.values()),
-                    ' '.join(map(str, atoms[p.atoms].residues.resids)),
-                    ' '.join(map(str, atoms[p.atoms].ids))
-                ))
+                if write_atoms:
+                    writer.writerow((
+                        frame, 
+                        frames[frame], 
+                        id,  
+                        *(f'{v:.2g}' for v in props.values()),
+                        ' '.join(map(str, atoms[p.atoms].residues.resids)),
+                        ' '.join(map(str, atoms[p.atoms].ids))
+                    ))
 
-def plot_desciptors(out_dir, pockets: list[Pocket]):
+                else:
+                    writer.writerow((
+                        frame, 
+                        frames[frame], 
+                        id,  
+                        *(f'{v:.2g}' for v in props.values()),
+                        ' '.join(map(str, atoms[p.atoms].residues.resids)),
+                    ))
+
+def plot_descriptors(out_dir, pockets: list[Pocket]):
     '''
         Plot the descriptors for each pocket in the list.
     '''
