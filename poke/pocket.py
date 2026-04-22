@@ -26,7 +26,7 @@ class Pocket:
         self.charges = charges
         self.lengths = lengths
         self.enclosure = enclosure
-        self.n_apolar_atoms, self.n_polar_atoms, self.n_charges_atoms = np.histogram(np.abs(charges), bins=[0, 0.3, 0.7, 10])[0]
+        self.n_apolar_atoms, self.n_polar_atoms, self.n_charged_atoms = np.histogram(np.abs(charges), bins=[0, 0.3, 0.7, 10])[0]
         self.hydrophobicity = self.n_apolar_atoms / self.atoms.shape[0]
         self.score = None
 
@@ -44,7 +44,7 @@ class Pocket:
     
     @property
     def accessible(self):
-        return self.accessible_points.shape[0] * self.volume_unit**(2/3) * 64
+        return self.accessible_points.shape[0] * self.volume_unit * 64
     
     @property
     def volume_positions(self):
@@ -174,14 +174,14 @@ class Pocket:
     
     properties = {
         'Score': ('score', {'color': '#f74d75'}),
-        'Volume': ('volume', {'color': '#90be6d'}),
+        'Core Volume': ('volume', {'color': '#90be6d'}),
         'Surface': ('surface', {'color': '#577590'}), 
-        'Accessible': ('accessible', {'color': '#90be6d', 'bins': lambda v: np.arange(v.min(), v.max()+2, step=8)}),
+        'Accessible Volume': ('accessible', {'color': '#90be6d', 'bins': lambda v: np.arange(v.min(), v.max()+2, step=8)}),
         'Length1': ('lengths', {'color': '#43aa8b'}, 0),
         'Length2': ('lengths', {'color': '#43aa8b'}, 1),
         'Length3': ('lengths', {'color': '#43aa8b'}, 2),
         'Hydrophobicity': ('hydrophobicity', {'color': '#f9c74f'}),
         'Enclosure': ('enclosure', {'color': '#2a6f97'}),
         '#PolarAtoms': ('n_polar_atoms', {'color': '#f8961e', 'bins': lambda v: np.arange(v.min(), v.max()+2)}),
-        '#ChargedAtoms': ('n_charges_atoms', {'color': '#9b5de5'}),
+        '#ChargedAtoms': ('n_charged_atoms', {'color': '#9b5de5'}),
     }

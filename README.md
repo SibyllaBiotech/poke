@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/poke)](https://pypi.org/project/poke/)
 
 # Overview
-Poké is a high-performance pocket scouting engine . It uses an energy-based approach to identify low-energy regions on protein surfaces. These regions are characterized by a set of physical descriptors, which are used by a neural network to assign a ligandability score to the pocket.
+Poké is a high-performance pocket scouting engine. It uses an energy-based approach to identify low-energy regions on protein surfaces. These regions are characterized by a set of physical descriptors, which are used by a neural network to assign a ligandability score to the pocket.
 
 It is designed to be used on long molecular dynamics trajectories, but it works equally well on single frames.
 
@@ -216,7 +216,7 @@ poke -dvp -f "score > 6 and enclosure > 0.5" protein.pdb
 
 ### Available properties
 
-All pocket descriptors are available in filter and sort expressions: `score`, `volume`, `surface`, `accessible`, `hydrophobicity`, `enclosure`, `lengths` (array of 3), `n_polar_atoms`, `n_charges_atoms`, `n_apolar_atoms`.
+All pocket descriptors are available in filter and sort expressions: `score`, `volume`, `surface`, `accessible`, `hydrophobicity`, `enclosure`, `lengths` (array of 3), `n_polar_atoms`, `n_charged_atoms`, `n_apolar_atoms`.
 
 ### Filter functions
 
