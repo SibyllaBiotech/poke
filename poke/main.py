@@ -10,7 +10,7 @@ import numpy as np
 from pathlib import Path
 import shlex
 
-from poke import Poke, Pocket, DEFAULT_ACCESSIBLE_CUTOFF
+from poke import Poke, Pocket, DEFAULT_MIN_VOLUME, DEFAULT_ACCESSIBLE_CUTOFF
 from poke.filter import PocketEvaluator
 from poke.writer import PocketWriter
 
@@ -83,6 +83,9 @@ def main():
                         'save lauch command in a bash script to be able to rerun with the same parameters')
     parser.add_argument('-ks', '--keep-subpockets', action='store_true', default=False, help=
                         'keep all pockets even if they share regions, instead of only the highest scoring one.')
+    parser.add_argument('-mv', '--min-volume', type=float, metavar='', default=DEFAULT_MIN_VOLUME, help=
+                        'minimum volume of the pocket core in cubic angstroms. '
+                        'Pockets with a smaller volume are discarded. Default is %(default)s A^3.')
     parser.add_argument('-ac', '--accessible-cutoff', type=float, metavar='', default=DEFAULT_ACCESSIBLE_CUTOFF, help=
                         'distance in angstroms around the pocket core within which the low-energy points '
                         'are counted as accessible volume. Default is %(default)s A.')
@@ -220,7 +223,7 @@ def run(out_dir: Path, structures: list[Path], args: argparse.Namespace):
 
     # Initialize the scouter with the atoms 
     scouter = Poke.from_mdanalysis(atoms_scouter, scoring_model=args.scoring_function, keep_subpockets=args.keep_subpockets,
-                                   accessible_cutoff=args.accessible_cutoff)
+                                   min_volume=args.min_volume, accessible_cutoff=args.accessible_cutoff)
 
     frames = []
     pockets = []

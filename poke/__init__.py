@@ -11,6 +11,7 @@ from .parametrizer import AtomsParametrizer, charmm
 from .algorithms import get_pockets
 
 # Default values shared between the Poke object and the command line interface
+DEFAULT_MIN_VOLUME = 15
 DEFAULT_ACCESSIBLE_CUTOFF = 1.0
 
 class Poke:
@@ -20,7 +21,7 @@ class Poke:
                  sigmas: np.ndarray, epsilons: np.ndarray,
                  spacing: float=0.5, cutoff: float=7.5, keep_subpockets: bool=False,
                  electro_force: float=1120, probe_sigma: float=3.8,
-                 energy_threshold: float=-14.5, min_volume: float=15, 
+                 energy_threshold: float=-14.5, min_volume: float=DEFAULT_MIN_VOLUME,
                  min_spot_volume: float=2.7, max_bulk_distance: float=1.8, 
                  max_spot_distance: float=3.6,
                  accessible_cutoff: float=DEFAULT_ACCESSIBLE_CUTOFF,
