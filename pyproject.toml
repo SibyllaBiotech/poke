@@ -26,5 +26,8 @@ poke = "poke.main:main"
 packages = ["poke", "poke.preparator"]
 include-package-data = true
 
+[tool.setuptools.dynamic]
+version = {attr = "poke.__version__"}
+
 [tool.setuptools.package-data]
 poke = ["model.pickle", "charmm36m/*.json", "charmm36m/*.csv"]
