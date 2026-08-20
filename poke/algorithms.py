@@ -92,7 +92,7 @@ def compute_low_resolution_grid(energy_map: np.ndarray, grid_cutoff: float,
 def enhance_volumes(energy_map: np.ndarray, isovalue: float, 
                     neighbours: np.ndarray, grid_positions: np.ndarray,
                     probe_sigmas2: np.ndarray, probe_epsilons: np.ndarray, sigma_charges: np.ndarray,
-                    min_spot_points: int):
+                    min_spot_points: int, accessible_cutoff: float):
     '''
         Expand the low-energy regions found in the low-resolution map. This expansion is 
         carried out on the high-resolution map by computing the potential in the missing positions.
@@ -223,7 +223,7 @@ def enhance_volumes(energy_map: np.ndarray, isovalue: float,
                 surface_points,
                 compute_box(surface_points),
                 get_region_atoms(surface_points, neighbours=neighbours, grid_positions=grid_positions, k_nearest=5),
-                compute_accessible_volume(surface_points, energy_map=energy_map, cutoff=2)
+                compute_accessible_volume(surface_points, energy_map=energy_map, cutoff=accessible_cutoff)
             ))
 
             i_region += 1
@@ -481,7 +481,8 @@ def compute_accessible_volume(points, energy_map: np.ndarray, cutoff):
 @nb.njit(cache=True, fastmath=True, nogil=True) 
 def get_pockets(positions: np.ndarray, inverse_spacing: float, grid_cutoff: float, energy_threshold: float,
                 probe_sigmas2: np.ndarray, probe_epsilons: np.ndarray, sigma_charges: np.ndarray,
-                min_spot_points: int, max_spot_distance: float, max_bulk_distance: float, min_points: int):
+                min_spot_points: int, max_spot_distance: float, max_bulk_distance: float, min_points: int,
+                accessible_cutoff: float):
     
     box = compute_box(positions)
 
@@ -508,7 +509,8 @@ def get_pockets(positions: np.ndarray, inverse_spacing: float, grid_cutoff: floa
     regions = enhance_volumes(
             energy_map, energy_threshold, 
             neighbours, grid_positions,
-            probe_sigmas2, probe_epsilons, sigma_charges, min_spot_points=min_spot_points)
+            probe_sigmas2, probe_epsilons, sigma_charges, min_spot_points=min_spot_points,
+            accessible_cutoff=accessible_cutoff)
 
     groups = cluster_regions(regions=regions, grid_positions=grid_positions, neighbours=neighbours,
                     probe_sigmas2=probe_sigmas2, max_bulk_distance=max_bulk_distance,

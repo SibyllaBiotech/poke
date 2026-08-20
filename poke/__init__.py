@@ -10,6 +10,9 @@ from .pocket import Pocket
 from .parametrizer import AtomsParametrizer, charmm
 from .algorithms import get_pockets
 
+# Default values shared between the Poke object and the command line interface
+DEFAULT_ACCESSIBLE_CUTOFF = 1.0
+
 class Poke:
     scoring_models = {}
 
@@ -19,7 +22,9 @@ class Poke:
                  electro_force: float=1120, probe_sigma: float=3.8,
                  energy_threshold: float=-14.5, min_volume: float=15, 
                  min_spot_volume: float=2.7, max_bulk_distance: float=1.8, 
-                 max_spot_distance: float=3.6, scoring_model: str='model'):
+                 max_spot_distance: float=3.6,
+                 accessible_cutoff: float=DEFAULT_ACCESSIBLE_CUTOFF,
+                 scoring_model: str='model'):
         '''
         Poke object found drugguable pockets.
         Atom properties must be provided using one of the methods available.
@@ -63,6 +68,10 @@ class Poke:
             max_spot_distance: float
                 Regions within this distance relative to the bulk are merged in the pocket.
                 The assignment is not recoursive.
+            accessible_cutoff: float
+                Distance in angstroms around the pocket core within which the low-energy
+                points are counted as accessible volume. Increasing this value more of the
+                volume around the core is counted.
         '''
 
         # Store the parameters
@@ -77,6 +86,7 @@ class Poke:
         self.min_spot_points = min_spot_volume * self.inverse_spacing**3
         self.max_bulk_distance = max_bulk_distance * self.inverse_spacing
         self.max_spot_distance = max_spot_distance * self.inverse_spacing
+        self.accessible_cutoff = accessible_cutoff * self.inverse_spacing
         self.keep_subpockets = keep_subpockets
 
         # Store the atoms' properties
@@ -162,8 +172,8 @@ class Poke:
                         grid_cutoff=self.grid_cutoff, energy_threshold=self.energy_threshold,
                         probe_sigmas2=self.probe_sigmas2, probe_epsilons=self.probe_epsilons,
                         sigma_charges=self.sigma_charges, min_spot_points=self.min_spot_points,
-                        max_spot_distance=self.max_spot_distance, max_bulk_distance=self.max_bulk_distance, 
-                        min_points=self.min_points)
+                        max_spot_distance=self.max_spot_distance, max_bulk_distance=self.max_bulk_distance,
+                        min_points=self.min_points, accessible_cutoff=self.accessible_cutoff)
 
         # Create the pockets objects
         pockets = [
