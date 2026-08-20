@@ -419,8 +419,13 @@ def get_region_atoms(points, neighbours, grid_positions, k_nearest):
     return atoms, net_vector, net_count
 
 @nb.njit(cache=True, fastmath=True, nogil=True)
-def compute_accessible_volume(points, energy_map: np.ndarray, cutoff=5):
+def compute_accessible_volume(points, energy_map: np.ndarray, cutoff):
     accessible_points = set()
+
+    # Half-width of the search box, in grid units. It's the smallest multiple of 4
+    # greater or equal to the cutoff, so that the box follows the cutoff. A fixed box
+    # clips every cutoff wider than the box itself.
+    n_box = 4 * int(np.ceil(cutoff / 4.0))
 
     for p in range(points.shape[0]):
         px = points[p,0]
@@ -432,12 +437,12 @@ def compute_accessible_volume(points, energy_map: np.ndarray, cutoff=5):
         pz4 = ((pz + 2) >> 2) << 2
 
         # Compute the influence boundaries of this atom
-        min_kx = max(px4-4, 0)
-        min_ky = max(py4-4, 0)
-        min_kz = max(pz4-4, 0)
-        max_kx = min(px4+5, energy_map.shape[0])
-        max_ky = min(py4+5, energy_map.shape[1])
-        max_kz = min(pz4+5, energy_map.shape[2])
+        min_kx = max(px4-n_box, 0)
+        min_ky = max(py4-n_box, 0)
+        min_kz = max(pz4-n_box, 0)
+        max_kx = min(px4+n_box+1, energy_map.shape[0])
+        max_ky = min(py4+n_box+1, energy_map.shape[1])
+        max_kz = min(pz4+n_box+1, energy_map.shape[2])
 
         # Use a value of 4 to match the step of the low-resolution grid,
         # as it's one-fourth the resolution of the original grid.
