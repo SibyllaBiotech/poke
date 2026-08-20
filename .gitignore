@@ -3,15 +3,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Packaging
 *.egg-info/
-
-/.env
-/stuff
-/scoring
-/jobs
-/benchmark
-/.sib
-
 /build
-/forcefield
+
+# Local environment and scratch runs
+/.env
 /tests
