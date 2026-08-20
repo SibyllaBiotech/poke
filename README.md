@@ -131,9 +131,9 @@ Use the `-d` flag to save pocket descriptors in a CSV file (`descriptors.csv`). 
 | `OriginalFrame` | Index of the frame in the input trajectory. When multiple trajectories are concatenated this is the index in the concatenated trajectory (the reference frame is not counted). |
 | `PocketResid` | Residue ID assigned to the pocket in the volume PDB file (starting at 800). |
 | `Score` | Druggability score assigned by the neural network model. |
-| `Volume` | Low-energy space available to the ligand, in Å³. Proportional to the number of grid points and the grid spacing. |
+| `Core Volume` | Low-energy space available to the ligand, in Å³. Proportional to the number of grid points and the grid spacing. |
 | `Surface` | Surface area of the pocket, in Å². A point is considered superficial when it has fewer than 5 adjacent points. The surface-to-volume ratio provides insight into pocket shape. |
-| `Accessible` | Solvent-accessible surface area of the pocket, in Å². |
+| `Accessible Volume` | Low-energy space surrounding the pocket core, in Å³. Counted on the low-resolution grid within the distance set by `--accessible-cutoff`. |
 | `Length1` | First principal length of the pocket, computed as the square root of the largest eigenvalue of the covariance matrix of the pocket points. |
 | `Length2` | Second principal length. |
 | `Length3` | Third principal length (smallest). |
@@ -216,7 +216,7 @@ poke -dvp -f "score > 6 and enclosure > 0.5" protein.pdb
 
 ### Available properties
 
-All pocket descriptors are available in filter and sort expressions: `score`, `volume`, `surface`, `accessible`, `hydrophobicity`, `enclosure`, `lengths` (array of 3), `n_polar_atoms`, `n_charged_atoms`, `n_apolar_atoms`.
+All pocket descriptors are available in filter and sort expressions: `score`, `volume`, `surface`, `accessible`, `hydrophobicity`, `enclosure`, `lengths` (array of 3), `n_polar_atoms`, `n_charged_atoms`, `n_apolar_atoms`. Note that `volume` and `accessible` are the properties written in the `Core Volume` and `Accessible Volume` columns.
 
 ### Filter functions
 

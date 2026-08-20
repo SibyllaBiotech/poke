@@ -59,6 +59,13 @@ poke [options] structures [structures ...]
 | `-ss`, `--selection-scouter SEL` | `all` (or auto with `--prepare`) | Selection of atoms used by the scouter. Uses MDAnalysis selection syntax. When `--prepare` is used without `-ss`, defaults to the prepared atoms selection. |
 | `-so`, `--selection-output SEL` | `all` | Selection of atoms written in the output trajectory. Atoms outside this selection are still used for energy maps unless removed by `-ss`. |
 
+## Pocket Detection
+
+| Flag | Default | Description |
+|---|---|---|
+| `-mv`, `--min-volume V` | `15` | Minimum volume of the pocket core in Å³. Pockets with a smaller volume are discarded. |
+| `-ac`, `--accessible-cutoff R` | `1.0` | Distance in Å around the pocket core within which the low-energy points are counted as accessible volume. |
+
 ## Scoring
 
 | Flag | Default | Description |
