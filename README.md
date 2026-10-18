@@ -1,7 +1,7 @@
-![poke](./img/poke-banner.svg)
-[![PyPI](https://img.shields.io/pypi/v/poke)](https://pypi.org/project/poke/)
-[![License](https://img.shields.io/pypi/l/poke)](https://github.com/SibyllaBiotech/poke/blob/main/LICENSE)
-[![Python](https://img.shields.io/pypi/pyversions/poke)](https://pypi.org/project/poke/)
+![poke](https://raw.githubusercontent.com/SibyllaBiotech/poke/main/img/poke-banner.svg)
+[![PyPI](https://img.shields.io/pypi/v/poke-scouter)](https://pypi.org/project/poke-scouter/)
+[![License](https://img.shields.io/pypi/l/poke-scouter)](https://github.com/SibyllaBiotech/poke/blob/main/LICENSE)
+[![Python](https://img.shields.io/pypi/pyversions/poke-scouter)](https://pypi.org/project/poke-scouter/)
 
 # Overview
 Poké is a high-performance pocket scouting engine. It uses an energy-based approach to identify low-energy regions on protein surfaces. These regions are characterized by a set of physical descriptors, which are used by a neural network to assign a ligandability score to the pocket.
@@ -10,10 +10,11 @@ It is designed to be used on long molecular dynamics trajectories, but it works 
 
 
 ## Installation
-Poké is available as a wheel package for macOS, Windows and Linux on PyPI. Install it using `pip`:
+Poké is available on PyPI under the name `poke-scouter`. Install it using `pip`:
 ```console
-python -m pip install poke
+python -m pip install poke-scouter
 ```
+The package provides the `poke` command and the `poke` Python module.
 Alternatively, the package can be installed directly from GitHub:
 ```console
 git clone https://github.com/SibyllaBiotech/poke
