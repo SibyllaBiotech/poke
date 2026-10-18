@@ -4,10 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "poke"
+description = "Pocket scouting engine for protein structures and molecular dynamics trajectories"
 readme = "README.md"
+requires-python = ">=3.10"
 authors = [{name = "Sibylla Biotech", email = "computationals@sibyllabiotech.it"}]
 license = {file = "LICENSE"}
-classifiers = ["License :: OSI Approved :: MIT License"]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Operating System :: OS Independent",
+]
+keywords = ["binding pocket", "druggability", "ligandability", "molecular dynamics", "protein structure"]
 dynamic = ["version"]
 
 dependencies = [
@@ -18,7 +27,11 @@ dependencies = [
 ]
 
 [project.urls]
-Home = "https://github.com/SibyllaBiotech/poke"
+Homepage = "https://github.com/SibyllaBiotech/poke"
+Documentation = "https://sibyllabiotech.github.io/poke-docs/"
+Source = "https://github.com/SibyllaBiotech/poke"
+Issues = "https://github.com/SibyllaBiotech/poke/issues"
+Paper = "https://doi.org/10.1021/acsomega.6c04816"
 
 [project.scripts]
 poke = "poke.main:main"
