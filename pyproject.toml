@@ -4,6 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "poke"
+readme = "README.md"
 authors = [{name = "Sibylla Biotech", email = "computationals@sibyllabiotech.it"}]
 license = {file = "LICENSE"}
 classifiers = ["License :: OSI Approved :: MIT License"]
