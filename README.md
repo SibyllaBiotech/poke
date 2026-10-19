@@ -247,11 +247,10 @@ The scouter can be used through Python for maximum flexibility:
 from poke import Poke
 from MDAnalysis import Universe
 
-u = Universe('1gkc.pdb') 
+u = Universe('1gkc.pdb')
 
-scouter = Poke()
-scouter.from_mdanalysis(u.atoms)
-pockets = scouter.get_pockets(u.atoms.positions)  
+scouter = Poke.from_mdanalysis(u.atoms)
+pockets = scouter.get_pockets(u.atoms.positions)
 
 for p in pockets:
     print(p)
