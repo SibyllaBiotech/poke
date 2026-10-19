@@ -33,105 +33,125 @@ resid_start = 800
 
 def build_parser() -> argparse.ArgumentParser:
     '''Build the command-line parser. Used by main() and by the documentation.'''
-    parser = argparse.ArgumentParser(prog='poke')
+    parser = argparse.ArgumentParser(prog='poke', add_help=False)
     parser.add_argument('structures', nargs='+', type=Path, help=
                         'input strctures (.pdb, .gro, .pdbqt, .xtc, ...).\n'
                         'List of proteins to search for pockets.\n'
                         'When coordinate-only file is passed the previous stucture '
                         ' is used to open it. '
                         'A txt file can be passed containing additional structures one per line.')     
-    parser.add_argument('-o', '--output', type=Path, metavar='', default=Path(''), help=
-                        'output path where to create the folders with the results.')
-    parser.add_argument('-d', '--descriptors', action='store_true', default=False, help=
-                        'compute the descriptors and save them in a csv file.')
-    parser.add_argument('--write-atoms', action='store_true', default=False, help=
-                        'add the pocket atoms to the output descriptors csv file (Note: requires -d flag)')
-    parser.add_argument('-v', '--volumes', action='store_true', default=False, help=
-                        'save the volumes and save them in a multi-model PDB file.')
-    parser.add_argument('-dx', '--density', action='store_true', default=False, help=
-                        'save the density map of the pockets in a dx file.')
-    parser.add_argument('-ss', '--selection-scouter', type=str, metavar='', default=None, help=
-                        'selection of atoms used by the scouter.')
-    parser.add_argument('-so', '--selection-output', type=str, metavar='', default='all', help=
-                        'selection of atoms written in the output.')
-    parser.add_argument('-sf', '--scoring-function', type=str, metavar='', default='model', help=
-                        'scoring function used')
-    parser.add_argument('-e', '--extract', action='store_true', default=False, help=
-                        'save the results relative to a new trajectory containing only frames with at least one pocket.')
-    parser.add_argument('-a', '--align', type=str, metavar='', default=None, help=
-                        'align the given atoms selection to the reference')
-    parser.add_argument('-r', '--reference', type=str, metavar='', default=None, help=
-                        'reference used for alignment. Default is the first structure.')
-    parser.add_argument('-s', '--sort', type=str, metavar='', default=None, help=
-                        'sorting by the value of an expression.')
-    parser.add_argument('-n', '--max-output-frames', type=int, metavar='', default=None, help=
-                        'maximum number of pocket in the output. Only when --sort is used.')
-    parser.add_argument('-p', '--pymol', action='store_true', default=False, help=
-                        'save a pymol script usable to open the pockets found.')
-    parser.add_argument('-g', '--graph', action='store_true', default=False, help=
-                        'plot distributions of pocket descriptors.')
-    parser.add_argument('-k', '--pickle', action='store_true', default=False, help=
-                        'save a pickle with a list of pockets for each frame.')
-    parser.add_argument('-q', '--quiet', action='store_true', default=False, help=
-                        'avoid to writing the progess for long trajectories.')
-    parser.add_argument('-f', '--filter', type=str, metavar='', default=None, help=
-                        'filter the pockets with a condition.')
-    parser.add_argument('-z', '--compress', action='store_true', default=False, help=
-                        'compress the results using gzip, most of the programs can read them without problem.')
-    parser.add_argument('-nc','--ncores', type=int, metavar='', default=None, help=
-                        'number of cores used to parallelize the computation of trajectories or multimodel pdb files')
-    parser.add_argument('-ls', '--launch-script', action='store_true', default=False, help=
-                        'save lauch command in a bash script to be able to rerun with the same parameters')
-    parser.add_argument('-ks', '--keep-subpockets', action='store_true', default=False, help=
-                        'keep all pockets even if they share regions, instead of only the highest scoring one.')
-    parser.add_argument('-mv', '--min-volume', type=float, metavar='', default=DEFAULT_MIN_VOLUME, help=
-                        'minimum volume of the pocket core in cubic angstroms. '
-                        'Pockets with a smaller volume are discarded. Default is %(default)s A^3.')
-    parser.add_argument('-ac', '--accessible-cutoff', type=float, metavar='', default=DEFAULT_ACCESSIBLE_CUTOFF, help=
-                        'distance in angstroms around the pocket core within which the low-energy points '
-                        'are counted as accessible volume. Default is %(default)s A.')
 
-    # Struture preparation arguments
-    preparator_parser = parser.add_argument_group('structure preparation options')
-    preparator_parser.add_argument('--prepare', action='store_true', default=False, help=
+    # The help option is registered first so that it leads the usage line, as users expect;
+    # the groups are created in the order their sections appear in the help text.
+    output = parser.add_argument_group('output options')
+    general = parser.add_argument_group('general options')
+    general.add_argument('-h', '--help', action='help', help='show this help message and exit')
+    output.add_argument('-d', '--descriptors', action='store_true', default=False, help=
+                        'compute the descriptors and save them in a csv file.')
+    output.add_argument('--write-atoms', action='store_true', default=False, help=
+                        'add the pocket atoms to the output descriptors csv file (Note: requires -d flag)')
+    output.add_argument('-v', '--volumes', action='store_true', default=False, help=
+                        'save the volumes and save them in a multi-model PDB file.')
+    output.add_argument('-p', '--pymol', action='store_true', default=False, help=
+                        'save a pymol script usable to open the pockets found.')
+    output.add_argument('-dx', '--density', action='store_true', default=False, help=
+                        'save the density map of the pockets in a dx file.')
+    output.add_argument('-e', '--extract', action='store_true', default=False, help=
+                        'save the results relative to a new trajectory containing only frames with at least one pocket.')
+    output.add_argument('-k', '--pickle', action='store_true', default=False, help=
+                        'save a pickle with a list of pockets for each frame.')
+    output.add_argument('-g', '--graph', action='store_true', default=False, help=
+                        'plot distributions of pocket descriptors.')
+    output.add_argument('-ls', '--launch-script', action='store_true', default=False, help=
+                        'save lauch command in a bash script to be able to rerun with the same parameters')
+
+    general.add_argument('-o', '--output', type=Path, metavar='PATH', default=Path(''), help=
+                         'output path where to create the folders with the results.')
+    general.add_argument('-q', '--quiet', action='store_true', default=False, help=
+                         'avoid to writing the progess for long trajectories.')
+    general.add_argument('-nc','--ncores', type=int, metavar='N', default=None, help=
+                         'number of cores used to parallelize the computation of trajectories or multimodel pdb files')
+    general.add_argument('-z', '--compress', action='store_true', default=False, help=
+                         'compress the results using gzip, most of the programs can read them without problem.')
+
+    selection = parser.add_argument_group('atom selection options')
+    selection.add_argument('-ss', '--selection-scouter', type=str, metavar='SEL', default=None, help=
+                           'selection of atoms used by the scouter.')
+    selection.add_argument('-so', '--selection-output', type=str, metavar='SEL', default='all', help=
+                           'selection of atoms written in the output.')
+
+    alignment = parser.add_argument_group('alignment options')
+    alignment.add_argument('-a', '--align', type=str, metavar='SEL', default=None, help=
+                           'align the given atoms selection to the reference')
+    alignment.add_argument('-r', '--reference', type=str, metavar='PATH', default=None, help=
+                           'reference used for alignment. Default is the first structure.')
+
+    detection = parser.add_argument_group('pocket detection options')
+    detection.add_argument('-mv', '--min-volume', type=float, metavar='V', default=DEFAULT_MIN_VOLUME, help=
+                           'minimum volume of the pocket core in cubic angstroms. '
+                           'Pockets with a smaller volume are discarded. Default is %(default)s A^3.')
+    detection.add_argument('-ac', '--accessible-cutoff', type=float, metavar='R', default=DEFAULT_ACCESSIBLE_CUTOFF, help=
+                           'distance in angstroms around the pocket core within which the low-energy points '
+                           'are counted as accessible volume. Default is %(default)s A.')
+
+    scoring = parser.add_argument_group('scoring options')
+    scoring.add_argument('-sf', '--scoring-function', type=str, metavar='NAME', default='model', help=
+                         'scoring function used')
+
+    filtering = parser.add_argument_group('filtering and sorting options')
+    filtering.add_argument('-f', '--filter', type=str, metavar='EXPR', default=None, help=
+                           'filter the pockets with a condition.')
+    filtering.add_argument('-s', '--sort', type=str, metavar='EXPR', default=None, help=
+                           'sorting by the value of an expression.')
+    filtering.add_argument('-n', '--max-output-frames', type=int, metavar='N', default=None, help=
+                           'maximum number of pocket in the output. Only when --sort is used.')
+    filtering.add_argument('-ks', '--keep-subpockets', action='store_true', default=False, help=
+                           'keep all pockets even if they share regions, instead of only the highest scoring one.')
+
+    preparation = parser.add_argument_group('structure preparation options')
+    preparation.add_argument('--prepare', action='store_true', default=False, help=
                         'prepare the structures before scouting (select altLocs, add hydrogens and caps).'
                         'Default is to NOT prepare the structures.')
-    preparator_parser.add_argument('--keep-hydrogens', action='store_true', default=False, help=
+    preparation.add_argument('--keep-hydrogens', action='store_true', default=False, help=
                         'try to keep the existing hydrogens during preparation, adding only the missing ones.')
-    preparator_parser.add_argument('--selection-prepare', type=str, metavar='SEL', default=None, help=
+    preparation.add_argument('--selection-prepare', type=str, metavar='SEL', default=None, help=
                         'selection of atoms to prepare. Other atoms are kept as they are. '
                         'If not provided, only proteins, nucleic acids, '
                         'and common co-factors and structural ions are prepared.')
-    preparator_parser.add_argument('--caps-types', nargs='+', type=str, metavar='TYPE N_TERM C_TERM',
+
+    capping = parser.add_argument_group('capping options')
+    capping.add_argument('--caps-types', nargs='+', type=str, metavar='TYPE N_TERM C_TERM',
                         default='protein NH3+ COO- nucleic_acid 5TER 3TER'.split(), help=
                         'types of caps to add to the structures.')
-    preparator_parser.add_argument('--caps-exclude', nargs='*', type=str, metavar='NAME', 
+    capping.add_argument('--caps-exclude', nargs='*', type=str, metavar='NAME', 
                         default='ACE NME'.split(), help=
                         'list of residue names to exclude from capping. ')
-    preparator_parser.add_argument('--ignore-segid', action='store_true', default=False, help=
+    capping.add_argument('--ignore-segid', action='store_true', default=False, help=
                         'do not use the segid (chain) value to split the structure for capping.')
-    preparator_parser.add_argument('--max-other-len', type=int, metavar='LEN', default=5, help=
+    capping.add_argument('--max-other-len', type=int, metavar='LEN', default=5, help=
                         'maximum number of residues of type "other" before a chain is considered interrupted.')
-    preparator_parser.add_argument('--resid-threshold', type=int, metavar='LEN', default=50, help=
+    capping.add_argument('--resid-threshold', type=int, metavar='LEN', default=50, help=
                         'jump in residues to consider a chain interrupted. (used only if segid info is absent).')
-    preparator_parser.add_argument('--ter-indices', type=int, nargs='*', metavar='IX', default=[], help=
+    capping.add_argument('--ter-indices', type=int, nargs='*', metavar='IX', default=[], help=
                         'explicit list of 0-based indices of residues to be considered as terminal residues ' 
                         'for splitting.')
-    preparator_parser.add_argument('--his', type=str, metavar='TYPE', default='auto', help=
+
+    protonation = parser.add_argument_group('protonation state options')
+    protonation.add_argument('--his', type=str, metavar='TYPE', default='auto', help=
                         'type of histidine to use. Options are "auto", "bond", "HSP", "HSE", "HSD". '
                         'Default is "auto" which uses the presence of HD1 and HE2 or hydrogen bonding detection.')
-    preparator_parser.add_argument('--lys', type=str, metavar='TYPE', default='auto', help=
+    protonation.add_argument('--lys', type=str, metavar='TYPE', default='auto', help=
                         'type of lysine to use. Options are "auto", "LYS", "LSN". Default is "auto".')
-    preparator_parser.add_argument('--arg', type=str, metavar='TYPE', default='auto', help=
+    protonation.add_argument('--arg', type=str, metavar='TYPE', default='auto', help=
                         'type of arginine to use. Options are "auto", "ARG", "ARGN". Default is "auto".')
-    preparator_parser.add_argument('--glu', type=str, metavar='TYPE', default='auto', help=
+    protonation.add_argument('--glu', type=str, metavar='TYPE', default='auto', help=
                         'type of glutamate to use. Options are "auto", "GLU", "GLUP". Default is "auto".')
-    preparator_parser.add_argument('--asp', type=str, metavar='TYPE', default='auto', help=
+    protonation.add_argument('--asp', type=str, metavar='TYPE', default='auto', help=
                         'type of aspartate to use. Options are "auto", "ASP", "ASPP". Default is "auto".')
-    preparator_parser.add_argument('--cys', type=str, metavar='TYPE', default='auto', help=
+    protonation.add_argument('--cys', type=str, metavar='TYPE', default='auto', help=
                         'type of cysteine to use. Options are "auto", "bond", "CYS", "CYS2". ' \
                         'Default is "auto" wich uses the presence of HG1 or covalent bonding detection.')
-    preparator_parser.add_argument('--custom-restype', nargs='*', type=str, metavar='IX TYPE', help=
+    protonation.add_argument('--custom-restype', nargs='*', type=str, metavar='IX TYPE', help=
                         'custom residue type to use at specific 0-based residues ixs.')
     return parser
 
