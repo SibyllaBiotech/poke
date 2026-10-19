@@ -31,8 +31,9 @@ trajectory_suffixes = ('.xtc', '.trr', '.dcd')
 list_suffixes = ('.txt',)
 resid_start = 800
 
-def main():
-    parser = argparse.ArgumentParser()
+def build_parser() -> argparse.ArgumentParser:
+    '''Build the command-line parser. Used by main() and by the documentation.'''
+    parser = argparse.ArgumentParser(prog='poke')
     parser.add_argument('structures', nargs='+', type=Path, help=
                         'input strctures (.pdb, .gro, .pdbqt, .xtc, ...).\n'
                         'List of proteins to search for pockets.\n'
@@ -132,8 +133,12 @@ def main():
                         'Default is "auto" wich uses the presence of HG1 or covalent bonding detection.')
     preparator_parser.add_argument('--custom-restype', nargs='*', type=str, metavar='IX TYPE', help=
                         'custom residue type to use at specific 0-based residues ixs.')
-        
-    args = parser.parse_args()  
+    return parser
+
+
+def main():
+    parser = build_parser()
+    args = parser.parse_args()
     args.caps_types = {t: (cn, cc) for t, cn, cc in zip(args.caps_types[::3], args.caps_types[1::3], args.caps_types[2::3])}
     if args.custom_restype:
         args.custom_restype = {int(ix): t for ix, t in zip(args.custom_restype[::2], args.custom_restype[1::2])}
