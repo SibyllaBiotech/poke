@@ -36,7 +36,7 @@ The flags `-dvp` specify the desired output files:
 - `-v` for the volumes (a PDB file with the grid points of each pocket)
 - `-p` for a PyMOL script to visualize the pockets
 
-Use `-h` to see all available options, or see the [CLI Reference](CLI.md) for the complete list.
+Use `-h` to see all available options, or see the [CLI Reference](https://sibyllabiotech.github.io/poke-docs/CLI%20Reference.html) for the complete list.
 
 *Poké* can be used on multiple files:
 ```console

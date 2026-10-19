@@ -18,6 +18,9 @@ Packaging and documentation for the first release on PyPI. The results are ident
 - Command-line help: the options are grouped into sections, the values have named
   placeholders and the wording is corrected.
 
+### Removed
+- `CLI.md`: the command-line reference is now a page of the user guide, generated from the code.
+
 ### Fixed
 - The Python example in the README did not run.
 
