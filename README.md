@@ -61,6 +61,8 @@ poke -dvp list.txt
 
 ## Structure Preparation
 
+<!-- docs:start structure-preparation -->
+
 The `--prepare` flag enables automatic structure preparation before pocket scouting. This includes selecting the best alternate locations, adding missing hydrogen atoms according to the CHARMM force field, and assigning terminal caps to chains. When preparation is enabled, the extraction flag (`-e`) is automatically turned on so that the protonated structure is written to the output.
 
 ```console
@@ -121,8 +123,11 @@ By default, only proteins, nucleic acids, and common cofactors and structural io
 poke -dvp --prepare --selection-prepare "protein" protein.pdb
 ```
 
+<!-- docs:end structure-preparation -->
 
 ## Output Descriptors
+
+<!-- docs:start descriptors -->
 
 Use the `-d` flag to save pocket descriptors in a CSV file (`descriptors.csv`). The file contains one row per pocket with the following columns, in order:
 
@@ -145,8 +150,11 @@ Use the `-d` flag to save pocket descriptors in a CSV file (`descriptors.csv`). 
 | `Residues` | Space-separated list of residue IDs that form the pocket. |
 | `Atoms` | *(Optional)* Space-separated list of atom indices belonging to the pocket. Only included when the `--write-atoms` flag is used. |
 
+<!-- docs:end descriptors -->
 
 ## Other Outputs
+
+<!-- docs:start outputs -->
 
 ### Extracted trajectory
 
@@ -193,15 +201,23 @@ The `-ls` flag saves the full *Poké* command to a bash script (`launch.sh`) for
 
 The `-z` flag compresses the volume PDB and pickle outputs using gzip (`.pdb.gz`, `.pickle.gz`). Most downstream programs can read gzip-compressed files directly.
 
+<!-- docs:end outputs -->
 
 ## Input Atoms Filtering
+
+<!-- docs:start input-filtering -->
+
 It is possible to use only a subset of the atoms to compute energy maps. The atoms can be selected using the `-ss` flag with an [MDAnalysis selection string](https://docs.mdanalysis.org/stable/documentation_pages/selections.html). For example, to select only protein atoms when the PDB file contains water molecules:
 ```console
 poke -dvp -ss "protein" protein.pdb
 ```
 The `-so` flag controls which atoms are written in the output trajectory. Atoms not in the `-so` selection are still used to compute energy maps unless removed with `-ss`.
 
+<!-- docs:end input-filtering -->
+
 ## Pocket Filtering
+
+<!-- docs:start pocket-filtering -->
 
 Pockets can be filtered by any property or by the residues involved. The `-f` flag takes a Python expression; a pocket is kept only if the expression evaluates to `True`.
 
@@ -241,7 +257,12 @@ The `-s` flag sorts pockets using the same expression syntax (descending order).
 poke -dvp -s score -n 5 protein.pdb
 ```
 
+<!-- docs:end pocket-filtering -->
+
 ## Python Package
+
+<!-- docs:start python-package -->
+
 The scouter can be used through Python for maximum flexibility:
 ```python
 from poke import Poke
@@ -259,7 +280,11 @@ for p in pockets:
 > [!NOTE] 
 > When using the CLI, the `-k` flag can be used to save the `Pocket` objects in a pickle file for later use in Python.
 
+<!-- docs:end python-package -->
+
 ## Plugins
+
+<!-- docs:start plugins -->
 
 ### Chimera plugin
 
@@ -270,3 +295,5 @@ The plugin allows interactive pocket scouting directly inside UCSF Chimera. To i
 ```console
 cp -r plugins/chimera/Poke /path-to-chimera/share/
 ```
+
+<!-- docs:end plugins -->
