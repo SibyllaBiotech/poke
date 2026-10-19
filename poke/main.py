@@ -33,7 +33,10 @@ resid_start = 800
 
 def build_parser() -> argparse.ArgumentParser:
     '''Build the command-line parser. Used by main() and by the documentation.'''
-    parser = argparse.ArgumentParser(prog='poke', add_help=False)
+    parser = argparse.ArgumentParser(prog='poke', add_help=False, epilog=
+                                     'SEL is an atom selection in the MDAnalysis selection syntax, '
+                                     'e.g. "protein", "resid 10:50" or "not resname HOH"; see '
+                                     'https://docs.mdanalysis.org/stable/documentation_pages/selections.html')
     parser.add_argument('structures', nargs='+', type=Path, help=
                         'input structures (.pdb, .gro, .pdbqt, .xtc, ...). '
                         'List of proteins to search for pockets. '
@@ -70,15 +73,18 @@ def build_parser() -> argparse.ArgumentParser:
     general.add_argument('-q', '--quiet', action='store_true', default=False, help=
                          'avoid writing the progress for long trajectories.')
     general.add_argument('-nc','--ncores', type=int, metavar='N', default=None, help=
-                         'number of cores used to parallelize the computation of trajectories or multi-model PDB files.')
+                         'number of cores used to parallelize the computation of trajectories or multi-model PDB files. '
+                         'By default it is chosen from the number of frames and the available cores.')
     general.add_argument('-z', '--compress', action='store_true', default=False, help=
                          'compress the results using gzip; most programs can read them without problem.')
 
     selection = parser.add_argument_group('atom selection options')
     selection.add_argument('-ss', '--selection-scouter', type=str, metavar='SEL', default=None, help=
-                           'selection of atoms used by the scouter.')
+                           'selection of atoms used by the scouter. '
+                           'Default is all the atoms, or the prepared atoms when --prepare is used.')
     selection.add_argument('-so', '--selection-output', type=str, metavar='SEL', default='all', help=
-                           'selection of atoms written in the output.')
+                           'selection of atoms written in the output. '
+                           'It does not change the atoms used by the scouter; see --selection-scouter.')
 
     alignment = parser.add_argument_group('alignment options')
     alignment.add_argument('-a', '--align', type=str, metavar='SEL', default=None, help=
@@ -100,9 +106,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     filtering = parser.add_argument_group('filtering and sorting options')
     filtering.add_argument('-f', '--filter', type=str, metavar='EXPR', default=None, help=
-                           'filter the pockets with a condition.')
+                           'keep only the pockets for which the Python expression is true. '
+                           'The pocket properties and the filter functions can be used in the expression; '
+                           'see the Pocket Filtering section of the documentation.')
     filtering.add_argument('-s', '--sort', type=str, metavar='EXPR', default=None, help=
-                           'sorting by the value of an expression.')
+                           'sort the pockets by the value of a Python expression, in descending order. '
+                           'Same syntax as --filter.')
     filtering.add_argument('-n', '--max-output-frames', type=int, metavar='N', default=None, help=
                            'maximum number of pockets in the output. Only when --sort is used.')
     filtering.add_argument('-ks', '--keep-subpockets', action='store_true', default=False, help=
@@ -152,7 +161,8 @@ def build_parser() -> argparse.ArgumentParser:
                         'type of cysteine to use. Options are "auto", "bond", "CYS", "CYS2". ' \
                         'Default is "auto" which uses the presence of HG1 or covalent bonding detection.')
     protonation.add_argument('--custom-restype', nargs='*', type=str, metavar='IX TYPE', help=
-                        'custom residue types to use at specific 0-based residue indices.')
+                        'custom residue types to use at specific 0-based residue indices, '
+                        'given as pairs of index and type, e.g. 42 HSE 105 CYS2.')
     return parser
 
 
