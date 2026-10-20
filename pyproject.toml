@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=77"]   # 77 introduced the SPDX licence fields below
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,9 +8,9 @@ description = "Pocket scouting engine for protein structures and molecular dynam
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{name = "Sibylla Biotech", email = "computationals@sibyllabiotech.it"}]
-license = {file = "LICENSE"}
+license = "MIT"
+license-files = ["LICENSE"]
 classifiers = [
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
@@ -37,11 +37,12 @@ Paper = "https://doi.org/10.1021/acsomega.6c04816"
 poke = "poke.main:main"
 
 [tool.setuptools]
-packages = ["poke", "poke.preparator"]
+packages = ["poke", "poke.preparator", "poke.charmm36m"]   # charmm36m holds data files only
 include-package-data = true
 
 [tool.setuptools.dynamic]
 version = {attr = "poke.__version__"}
 
 [tool.setuptools.package-data]
-poke = ["model.pickle", "charmm36m/*.json", "charmm36m/*.csv"]
+poke = ["model.pickle"]
+"poke.charmm36m" = ["*.json", "*.csv"]
