@@ -20,6 +20,8 @@ Packaging and documentation for the first release on PyPI. The results are ident
 
 ### Removed
 - `CLI.md`: the command-line reference is now a page of the user guide, generated from the code.
+- The developer-only code (force-field generator, docking benchmark, model training) is no
+  longer in the repository. It was never part of the installed package.
 
 ### Fixed
 - The Python example in the README did not run.
