@@ -11,12 +11,12 @@ It is designed to be used on long molecular dynamics trajectories, but it works 
 
 ## Installation
 Poké is available on PyPI under the name `poke-scouter`. Install it using `pip`:
-```console
+```bash
 python -m pip install poke-scouter
 ```
 The package provides the `poke` command and the `poke` Python module.
 Alternatively, the package can be installed directly from GitHub:
-```console
+```bash
 git clone https://github.com/SibyllaBiotech/poke
 pip install ./poke
 ```
@@ -26,7 +26,7 @@ pip install ./poke
 > All input structures passed to *Poké* must be protonated and the atom names should match the CHARMM or Amber convention. Alternatively, use the `--prepare` flag to let *Poké* handle protonation automatically (see [Structure Preparation](#structure-preparation)).
 
 *Poké* can be used on a single structure with the following command:
-```console
+```bash
 poke -dvp protein.pdb
 ```
 
@@ -39,22 +39,22 @@ The flags `-dvp` specify the desired output files:
 Use `-h` to see all available options, or see the [CLI Reference](https://sibyllabiotech.github.io/poke-docs/CLI%20Reference.html) for the complete list.
 
 *Poké* can be used on multiple files:
-```console
+```bash
 poke -dvp protein1.pdb protein2.pdb
 ```
 In this case it will create two output folders called `protein1` and `protein2`.
 
 To run the scouter on all frames of a trajectory, a reference structure must be provided to define the atom types (its positions will not be used):
-```console
+```bash
 poke -dvp reference.pdb trajectory.xtc
 ```
 Multiple trajectories can be concatenated:
-```console
+```bash
 poke -dvp reference.pdb trajectory1.xtc trajectory2.xtc
 ```
 
 If the input is a long list of different files they can be listed in a text file (`.txt`, one path per line) and passed to *Poké*:
-```console
+```bash
 poke -dvp list.txt
 ```
 
@@ -65,7 +65,7 @@ poke -dvp list.txt
 
 The `--prepare` flag enables automatic structure preparation before pocket scouting. This includes selecting the best alternate locations, adding missing hydrogen atoms according to the CHARMM force field, and assigning terminal caps to chains. When preparation is enabled, the extraction flag (`-e`) is automatically turned on so that the protonated structure is written to the output.
 
-```console
+```bash
 poke -dvp --prepare protein.pdb
 ```
 
@@ -79,7 +79,7 @@ When atoms have alternate locations (alt-locs), the preparator selects the best 
 ### Hydrogen addition
 
 Missing hydrogen atoms are added based on the CHARMM force field definitions. By default all existing hydrogens are removed and re-added. Use `--keep-hydrogens` to retain existing hydrogens and only add the missing ones:
-```console
+```bash
 poke -dvp --prepare --keep-hydrogens protein.pdb
 ```
 
@@ -112,14 +112,14 @@ Residues with titratable side chains can be assigned specific protonation states
 | `--asp TYPE` | `auto`, `ASP`, `ASPP` | — |
 
 For fine-grained control, `--custom-restype IX TYPE` can be used to override the residue type at specific 0-based indices:
-```console
+```bash
 poke -dvp --prepare --custom-restype 42 HSE 105 CYS2 protein.pdb
 ```
 
 ### Preparation selection
 
 By default, only proteins, nucleic acids, and common cofactors and structural ions are prepared. Use `--selection-prepare` with an [MDAnalysis selection string](https://docs.mdanalysis.org/stable/documentation_pages/selections.html) to control which atoms undergo preparation:
-```console
+```bash
 poke -dvp --prepare --selection-prepare "protein" protein.pdb
 ```
 
@@ -161,7 +161,7 @@ Use the `-d` flag to save pocket descriptors in a CSV file (`descriptors.csv`). 
 Normally *Poké* does not produce a new trajectory. Use the `-e` flag to extract frames that contain at least one pocket into a new trajectory file (`frames.xtc` + `structure.pdb`).
 
 Frames can be sorted by any pocket property using the `-s` flag (descending order). Combined with `-n`, only the top *n* frames are kept:
-```console
+```bash
 poke -dvp -e -s score -n 10 protein.pdb
 ```
 The `OutputFrame` column in the descriptors CSV reflects the new frame ordering after sorting.
@@ -208,7 +208,7 @@ The `-z` flag compresses the volume PDB and pickle outputs using gzip (`.pdb.gz`
 <!-- docs:start input-filtering -->
 
 It is possible to use only a subset of the atoms to compute energy maps. The atoms can be selected using the `-ss` flag with an [MDAnalysis selection string](https://docs.mdanalysis.org/stable/documentation_pages/selections.html). For example, to select only protein atoms when the PDB file contains water molecules:
-```console
+```bash
 poke -dvp -ss "protein" protein.pdb
 ```
 The `-so` flag controls which atoms are written in the output trajectory. Atoms not in the `-so` selection are still used to compute energy maps unless removed with `-ss`.
@@ -222,12 +222,12 @@ The `-so` flag controls which atoms are written in the output trajectory. Atoms 
 Pockets can be filtered by any property or by the residues involved. The `-f` flag takes a Python expression; a pocket is kept only if the expression evaluates to `True`.
 
 To select pockets with volume greater than 100 Å³:
-```console
+```bash
 poke -dvp -f "volume > 100" protein.pdb
 ```
 
 To combine conditions:
-```console
+```bash
 poke -dvp -f "score > 6 and enclosure > 0.5" protein.pdb
 ```
 
@@ -246,14 +246,14 @@ All pocket descriptors are available in filter and sort expressions: `score`, `v
 | `resids` | Set of residue IDs belonging to the pocket. |
 
 Example — keep only pockets that overlap with residues 42, 58, and 102:
-```console
+```bash
 poke -dvp -f "residues(42, 58, 102, min_common=2)" protein.pdb
 ```
 
 ### Sorting
 
 The `-s` flag sorts pockets using the same expression syntax (descending order). After sorting, `-n` limits the output to the first *n* pockets:
-```console
+```bash
 poke -dvp -s score -n 5 protein.pdb
 ```
 
@@ -292,7 +292,7 @@ for p in pockets:
 > The Chimera plugin is under development and could be currently broken.
 
 The plugin allows interactive pocket scouting directly inside UCSF Chimera. To install, copy the plugin directory to the Chimera share folder:
-```console
+```bash
 cp -r plugins/chimera/Poke /path-to-chimera/share/
 ```
 
