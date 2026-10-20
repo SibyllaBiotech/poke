@@ -79,8 +79,8 @@ class AtomsParametrizer:
                     ff_atoms = set(ff_atoms_list)
 
                     error_msg += (f'\n\nForcefield option {residue_key} {i}: {", ".join(sorted(ff_atoms))}' +
-                                '\nUnmatching input atoms:      ' + ", ".join(sorted(input_atoms - ff_atoms)) +
-                                '\nUnmatching forcefield atoms: ' + ", ".join(sorted(ff_atoms - input_atoms)))
+                                '\nUnmatched input atoms:      ' + ", ".join(sorted(input_atoms - ff_atoms)) +
+                                '\nUnmatched forcefield atoms: ' + ", ".join(sorted(ff_atoms - input_atoms)))
                                     
             raise ValueError(error_msg)
         

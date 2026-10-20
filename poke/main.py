@@ -237,7 +237,7 @@ def run(out_dir: Path, structures: list[Path], args: argparse.Namespace):
             print(f'\nStructure is being processed and no selection for scouting has been provided. '
                   f'Selection "{args.selection_scouter}" will be used for scouting.\n')
 
-        # Preparation always implys extraction to write protonated structures
+        # Preparation always implies extraction to write protonated structures
         args.extract = True 
 
     
@@ -661,7 +661,7 @@ class PocketsFoundColumn(progress.ProgressColumn):
         text = Text(f" {task.fields['n_kept_pockets']} pockets", style="magenta")
 
         if n_filtered > 0:
-            text += Text(f" {n_filtered} discarted", style="cyan")
+            text += Text(f" {n_filtered} discarded", style="cyan")
         return text
 
 
