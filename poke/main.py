@@ -95,10 +95,10 @@ def build_parser() -> argparse.ArgumentParser:
     detection = parser.add_argument_group('pocket detection options')
     detection.add_argument('-mv', '--min-volume', type=float, metavar='V', default=DEFAULT_MIN_VOLUME, help=
                            'minimum volume of the pocket core in cubic angstroms. '
-                           'Pockets with a smaller volume are discarded. Default is %(default)s A^3.')
+                           'Pockets with a smaller volume are discarded. Default is %(default)s Å³.')
     detection.add_argument('-ac', '--accessible-cutoff', type=float, metavar='R', default=DEFAULT_ACCESSIBLE_CUTOFF, help=
                            'distance in angstroms around the pocket core within which the low-energy points '
-                           'are counted as accessible volume. Default is %(default)s A.')
+                           'are counted as accessible volume. Default is %(default)s Å.')
 
     scoring = parser.add_argument_group('scoring options')
     scoring.add_argument('-sf', '--scoring-function', type=str, metavar='NAME', default='model', help=
