@@ -1,6 +1,6 @@
 """Poke scouter for protein druggable pockets"""
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 import pickle
 import numpy as np

@@ -7,7 +7,7 @@ All notable changes to Poké are recorded in this file, newest first. The format
 The user guide lives in a separate repository, [poke-docs](https://github.com/SibyllaBiotech/poke-docs).
 Every entry here that changes what users see (a flag, an output file, a descriptor) must be mirrored there before the release.
 
-## [Unreleased]
+## [0.1.1] - 2026-10-20
 
 Packaging and documentation for the first release on PyPI. The results are identical to 0.1.0.
 
@@ -25,6 +25,7 @@ Packaging and documentation for the first release on PyPI. The results are ident
 
 ### Fixed
 - The Python example in the README did not run.
+- Typos in the progress line and in an error message.
 
 ## [0.1.0] - 2026-08-20
 
