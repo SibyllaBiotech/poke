@@ -140,11 +140,11 @@ Use the `-d` flag to save pocket descriptors in a CSV file (`descriptors.csv`). 
 | `Core Volume` | Low-energy space available to the ligand, in Å³. Proportional to the number of grid points and the grid spacing. |
 | `Surface` | Surface area of the pocket, in Å². A point is considered superficial when it has fewer than 5 adjacent points. The surface-to-volume ratio provides insight into pocket shape. |
 | `Accessible Volume` | Low-energy space surrounding the pocket core, in Å³. Counted on the low-resolution grid within the distance set by `--accessible-cutoff`. |
-| `Length1` | First principal length of the pocket, computed as the square root of the largest eigenvalue of the covariance matrix of the pocket points. |
-| `Length2` | Second principal length. |
-| `Length3` | Third principal length (smallest). |
+| `Length1` | First principal length of the pocket: the square root of the largest eigenvalue of the covariance matrix of the pocket surface points, in units of the grid spacing (0.5 Å). |
+| `Length2` | Second principal length, in the same units. |
+| `Length3` | Third principal length (smallest), in the same units. |
 | `Hydrophobicity` | Fraction of pocket atoms with an absolute partial charge less than 0.3e. |
-| `Enclosure` | Enclosure indicator, computed by comparing the number of neighboring atoms to the pocket surface. |
+| `Enclosure` | Enclosure indicator between 0 and 1, computed from the vectors joining each surface point to its nearest atoms. In a buried pocket the atoms surround the points and the vectors cancel out, giving a value close to 1; in an open pocket they point one way and the value is close to 0. |
 | `#PolarAtoms` | Number of pocket atoms with an absolute partial charge between 0.3e and 0.7e. |
 | `#ChargedAtoms` | Number of pocket atoms with an absolute partial charge greater than 0.7e. |
 | `Residues` | Space-separated list of residue IDs that form the pocket. |
