@@ -1,0 +1,57 @@
+# Citation metadata in the Citation File Format (https://citation-file-format.github.io/).
+# GitHub reads this file to offer "Cite this repository" and shows the paper below.
+cff-version: 1.2.0
+message: "If you use Poké in your research, please cite the paper."
+type: software
+title: "Poké: Fast and Reliable Neural-Network-Based Identification of Protein Ligandable Sites"
+authors:
+  - family-names: Colasurdo
+    given-names: Enrica
+  - family-names: Boldrini
+    given-names: Alberto
+  - family-names: Terruzzi
+    given-names: Luca
+  - family-names: Langini
+    given-names: Cassiano
+  - family-names: Risueño Fernández
+    given-names: Cristina
+  - family-names: Varricchio
+    given-names: Carmine
+  - family-names: Primavera
+    given-names: Erika
+  - family-names: Cassese
+    given-names: Emilia
+  - family-names: Patsilinakos
+    given-names: Alexandros
+  - family-names: Spagnolli
+    given-names: Giovanni
+license: MIT
+repository-code: https://github.com/SibyllaBiotech/poke
+url: https://sibyllabiotech.github.io/poke-docs/
+preferred-citation:
+  type: article
+  title: "Poké: Fast and Reliable Neural-Network-Based Identification of Protein Ligandable Sites"
+  authors:
+    - family-names: Colasurdo
+      given-names: Enrica
+    - family-names: Boldrini
+      given-names: Alberto
+    - family-names: Terruzzi
+      given-names: Luca
+    - family-names: Langini
+      given-names: Cassiano
+    - family-names: Risueño Fernández
+      given-names: Cristina
+    - family-names: Varricchio
+      given-names: Carmine
+    - family-names: Primavera
+      given-names: Erika
+    - family-names: Cassese
+      given-names: Emilia
+    - family-names: Patsilinakos
+      given-names: Alexandros
+    - family-names: Spagnolli
+      given-names: Giovanni
+  journal: ACS Omega
+  year: 2026
+  doi: 10.1021/acsomega.6c04816

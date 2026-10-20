@@ -297,3 +297,9 @@ cp -r plugins/chimera/Poke /path-to-chimera/share/
 ```
 
 <!-- docs:end plugins -->
+
+## How to cite
+
+If you use Poké in your research, please cite:
+
+> Colasurdo, E., Boldrini, A., Terruzzi, L., Langini, C., Risueño Fernández, C., Varricchio, C., Primavera, E., Cassese, E., Patsilinakos, A. & Spagnolli, G. *Poké: Fast and Reliable Neural-Network-Based Identification of Protein Ligandable Sites.* ACS Omega (2026). https://doi.org/10.1021/acsomega.6c04816
