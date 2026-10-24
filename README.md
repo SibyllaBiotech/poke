@@ -8,6 +8,8 @@ Poké is a high-performance pocket scouting engine. It uses an energy-based appr
 
 It is designed to be used on long molecular dynamics trajectories, but it works equally well on single frames.
 
+For the full user guide and the tutorials, please visit https://sibyllabiotech.github.io/poke-docs/. Its source lives in the [poke-docs](https://github.com/SibyllaBiotech/poke-docs) repository.
+
 
 ## Installation
 Poké is available on PyPI under the name `poke-scouter`. Install it using `pip`:
