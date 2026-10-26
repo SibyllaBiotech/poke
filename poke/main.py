@@ -19,7 +19,9 @@ from .algorithms import add_pocket_to_density
 from .preparator import Preparator, MDAUniverse
 from .parametrizer import charmm
 
+import gemmi
 from MDAnalysis import Universe, AtomGroup, Writer, Merge
+from MDAnalysis.coordinates.memory import MemoryReader
 from .utils import Aligner
 from rich import progress
 from rich.text import Text
@@ -207,13 +209,21 @@ def run(out_dir: Path, structures: list[Path], args: argparse.Namespace):
     # Print the current structures
     print(f'{" ".join(map(str, structures))} ▶ ./{out_dir}')
 
+    # MDAnalysis reads only the first model of an mmCIF file: pass all the models as frames,
+    # as MDAnalysis does with the models of a PDB file.
+    models, reader = [], {}
+    if len(structures) == 1 and structures[0].suffix in ('.cif', '.mmcif'):
+        positions = read_mmcif_models(structures[0])
+        if len(positions) > 1:
+            models, reader = [positions], {'format': MemoryReader, 'topology_format': 'MMCIF'}
+
     if not args.prepare:
-        u = Universe(*structures)
+        u = Universe(*structures, *models, **reader)
         if args.selection_scouter is None:
             args.selection_scouter = 'all'
             
     else:
-        u = MDAUniverse(*structures,
+        u = MDAUniverse(*structures, *models,
                         selection=args.selection_prepare,
                         forcefield=charmm,
                         keep_existing=args.keep_hydrogens,
@@ -230,7 +240,8 @@ def run(out_dir: Path, structures: list[Path], args: argparse.Namespace):
                         glu=args.glu,
                         asp=args.asp,
                         cys=args.cys,
-                        specific=args.custom_restype)
+                        specific=args.custom_restype,
+                        **reader)
         
         if args.selection_scouter is None:
             args.selection_scouter = u.selection
@@ -341,6 +352,14 @@ def run(out_dir: Path, structures: list[Path], args: argparse.Namespace):
             stream.write('poke ' + shlex.join(sys.argv[1:]) + '\n')
 
 
+
+def read_mmcif_models(path: Path) -> np.ndarray:
+    '''Positions of the atoms in every model of an mmCIF file, one frame per model.'''
+    # Read as MDAnalysis does, so that the atoms come in the same order
+    structure = gemmi.make_structure_from_block(gemmi.cif.read(str(path))[0])
+    if len({model.count_atom_sites() for model in structure}) > 1:
+        raise UserError(f'The models of {path} do not have the same number of atoms.')
+    return np.asarray(gemmi.FlatStructure(structure).pos, dtype=np.float32).reshape(len(structure), -1, 3)
 
 def split_structures(structures: list[Path]):
     '''
