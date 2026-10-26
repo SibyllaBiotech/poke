@@ -7,6 +7,12 @@ All notable changes to Poké are recorded in this file, newest first. The format
 The user guide lives in a separate repository, [poke-docs](https://github.com/SibyllaBiotech/poke-docs).
 Every entry here that changes what users see (a flag, an output file, a descriptor) must be mirrored there before the release.
 
+## [Unreleased]
+
+### Fixed
+- `--prepare` crashed on single-frame files other than PDB, such as GRO and PDBQT
+  ("GROReader only contains a single frame").
+
 ## [0.1.1] - 2026-10-20
 
 Packaging and documentation for the first release on PyPI. The results are identical to 0.1.0.

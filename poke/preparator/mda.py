@@ -4,7 +4,7 @@ import warnings
 from MDAnalysis import Universe
 from MDAnalysis.core.topology import Topology
 from MDAnalysis.core.topologyattrs import AtomAttr
-from MDAnalysis.coordinates.base import ProtoReader
+from MDAnalysis.coordinates.base import ProtoReader, SingleFrameReaderBase
 
 from . import Preparator
 
@@ -78,6 +78,12 @@ class PreparatorReader(ProtoReader):
         
     
     def _read_next_timestep(self, ts=None):
+        # Readers of single-frame formats (GRO, PDBQT, mmCIF, ...) cannot step to a next frame:
+        # serve their only frame once, then signal the end of the trajectory.
+        if isinstance(self._reader, SingleFrameReaderBase):
+            if self.ts.frame >= 0:
+                raise EOFError
+            return self._read_frame(0)
         orig_ts = self._reader._read_next_timestep(ts)
         return self._update_ts(orig_ts)
     
