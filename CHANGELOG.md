@@ -7,7 +7,9 @@ All notable changes to Poké are recorded in this file, newest first. The format
 The user guide lives in a separate repository, [poke-docs](https://github.com/SibyllaBiotech/poke-docs).
 Every entry here that changes what users see (a flag, an output file, a descriptor) must be mirrored there before the release.
 
-## [Unreleased]
+## [0.2.0] - 2026-10-26
+
+Reads mmCIF files. Requires Python 3.11 or later.
 
 ### Added
 - mmCIF input files (`.cif`, `.mmcif`), the main format of the PDB and of the AlphaFold
