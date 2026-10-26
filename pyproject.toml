@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "poke-scouter"
 description = "Pocket scouting engine for protein structures and molecular dynamics trajectories"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [{name = "Sibylla Biotech", email = "computationals@sibyllabiotech.it"}]
 license = "MIT"
 license-files = ["LICENSE"]
@@ -22,7 +22,8 @@ dynamic = ["version"]
 dependencies = [
     "numpy",
     "numba",
-    "mdanalysis>=2.8",
+    "mdanalysis>=2.11",   # 2.11 is the first version that reads mmCIF, through gemmi
+    "gemmi>=0.7.5",
     "rich"
 ]
 

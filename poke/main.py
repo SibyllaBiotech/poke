@@ -26,7 +26,7 @@ from rich.text import Text
 
 warnings.filterwarnings('ignore', category=UserWarning, module='MDAnalysis')
 
-structure_suffixes = ('.pdb', '.gro', '.pdbqt')
+structure_suffixes = ('.pdb', '.cif', '.mmcif', '.gro', '.pdbqt')
 trajectory_suffixes = ('.xtc', '.trr', '.dcd')
 list_suffixes = ('.txt',)
 resid_start = 800
@@ -38,7 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
                                      'e.g. "protein", "resid 10:50" or "not resname HOH"; see '
                                      'https://docs.mdanalysis.org/stable/documentation_pages/selections.html')
     parser.add_argument('structures', nargs='+', type=Path, help=
-                        'input structures (.pdb, .gro, .pdbqt, .xtc, ...). '
+                        'input structures (.pdb, .cif, .mmcif, .gro, .pdbqt, .xtc, ...). '
                         'List of proteins to search for pockets. '
                         'When a coordinate-only file is passed, the previous structure '
                         'is used to open it. '

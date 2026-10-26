@@ -16,7 +16,7 @@ Poké is available on PyPI under the name `poke-scouter`. Install it using `pip`
 ```bash
 python -m pip install poke-scouter
 ```
-The package provides the `poke` command and the `poke` Python module.
+The package provides the `poke` command and the `poke` Python module. It requires Python 3.11 or later.
 Alternatively, the package can be installed directly from GitHub:
 ```bash
 git clone https://github.com/SibyllaBiotech/poke
@@ -31,6 +31,8 @@ pip install ./poke
 ```bash
 poke -dvp protein.pdb
 ```
+
+Structures can be PDB, mmCIF, GRO or PDBQT files, trajectories XTC, TRR or DCD files.
 
 The result will appear in a folder named after the input file (in this example `protein`) in the current working directory.
 The flags `-dvp` specify the desired output files:

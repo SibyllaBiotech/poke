@@ -9,6 +9,15 @@ Every entry here that changes what users see (a flag, an output file, a descript
 
 ## [Unreleased]
 
+### Added
+- mmCIF input files (`.cif`, `.mmcif`), the main format of the PDB and of the AlphaFold
+  database. MDAnalysis reads them through the gemmi library, now a dependency of Poké.
+  Of a file with several models, such as an NMR ensemble, only the first model is read.
+
+### Changed
+- Poké requires Python 3.11 or later and MDAnalysis 2.11 or later, the first version that
+  reads mmCIF.
+
 ### Fixed
 - `--prepare` crashed on single-frame files other than PDB, such as GRO and PDBQT
   ("GROReader only contains a single frame").
